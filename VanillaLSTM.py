@@ -8,6 +8,7 @@ import numpy as np
 import math
 from torch.utils.data import Dataset, DataLoader
 import pdb 
+import time
 
 
 # %%
@@ -145,6 +146,8 @@ class VanillaLSTM(nn.Module):
 
 # %%
 def train(T_obs, T_pred):
+    tic = time.time()
+
     h_dim = 100
     batch_size = 24
 
@@ -187,6 +190,10 @@ def train(T_obs, T_pred):
                     optimizer.zero_grad()
                     cost.backward()
                     optimizer.step()
+    
+    toc = time.time()
+    print("training consumed", toc-tic)
+
     return vl
 
 

@@ -8,6 +8,7 @@ import numpy as np
 import math
 from torch.utils.data import Dataset, DataLoader
 import pdb 
+import time
 
 
 # %%
@@ -118,7 +119,7 @@ class Phi(nn.Module):
 
 class SocialLSTM(nn.Module):
     def __init__(self, input_dim=2, hidden_dim=20, mediate_dim=10, output_dim=2, social_dim=120, traj_num=3, dropout_prob=0.2,
-                N_size, grid_cell_size):
+                N_size=4, grid_cell_size=1):
         super(SocialLSTM, self).__init__()
         #specify params
         self.input_dim, self.mediate_dim, self.output_dim, self.hidden_dim = input_dim, mediate_dim, output_dim, hidden_dim
@@ -179,6 +180,8 @@ class SocialLSTM(nn.Module):
 
 # %%
 def train(T_obs, T_pred):
+    tic = time.time()
+
     h_dim = 100
     batch_size = 24
 
@@ -191,37 +194,39 @@ def train(T_obs, T_pred):
     h = torch.zeros(traj_num, h_dim)
     c = torch.zeros(traj_num, h_dim)
 
-    vl = VanillaLSTM(hidden_dim=h_dim, mediate_dim=10, output_dim=2, traj_num=traj_num)
-    for param in vl.parameters():
-        param.requires_grad = True
+    sl = SocialLSTM(hidden_dim=h_dim, mediate_dim=10, output_dim=2, traj_num=traj_num)
 
     #define loss & optimizer
     criterion = nn.MSELoss(reduction="sum")
     # criterion = Gaussian2DNll
     
-    optimizer = torch.optim.Adagrad(vl.parameters(), weight_decay=0.0005)
+    optimizer = torch.optim.Adagrad(sl.parameters(), weight_decay=0.0005)
     print("training")
-    for epoch in range(500):
+    for epoch in range(2):
         for batch_idx, (part_masks, (input_seq, Y)) in enumerate(dataloader):
             if batch_idx < len(dataset) // batch_size:
                 Y = Y[:,:,2:]
                 with torch.autograd.set_detect_anomaly(True):         
                     #forward prop
-                    output = vl(input_seq, part_masks, h, c, T_obs, T_pred)
+                    output = sl(input_seq, part_masks, h, c, T_obs, T_pred)
 
                     #compute loss
                     Y_pred = output[T_obs+1:T_pred]
                     Y_g = Y[T_obs+1:T_pred]
                     cost = criterion(Y_pred, Y_g)
 
-                    if epoch % 10 == 9:
+                    if epoch % 10 != 9:
                         print(epoch, batch_idx, cost.item())
 
                     #backward prop
                     optimizer.zero_grad()
                     cost.backward()
                     optimizer.step()
-    return vl
+
+    toc = time.time()
+    print("training consumed", toc-tic)
+
+    return sl
 
 
 def validate(model, T_obs, T_pred):
@@ -266,5 +271,5 @@ def validate(model, T_obs, T_pred):
 
 
 if __name__ == "__main__":
-    vl = train(12, 20)
-    validate(vl, 12, 20)
+    sl = train(12, 20)
+    validate(sl, 12, 20)
