@@ -185,13 +185,11 @@ class SocialLSTM(nn.Module):
             r = self.Phi(self.InputEmbedding(x))
             #calc social pooling embedding
             H = self.socialPooling(all_h_t, x, part_masks[frame_idx][0])
-            time2 = time.time()
             e = self.Phi(self.SocialEmbedding(H))
             concat_embed = torch.cat((r,e), 1)
             all_h_t, all_c_t = self.LSTMCell(concat_embed, (all_h_t, all_c_t))
             part_mask = torch.t(part_masks[frame_idx]).expand(part_masks[frame_idx].shape[1], self.output_dim)
             outputs[frame_idx] = self.OutputLayer(all_h_t) * part_mask
-            time3 = time.time()
             # print(f"in a for total {time3-time1} pool {time2-time1}")
 
         return outputs
@@ -289,7 +287,6 @@ def validate(model, T_obs, T_pred):
                     for traj_idx in range(part_masks[frame_idx].shape[1]):
                         if part_masks[frame_idx+T_obs+1][0][traj_idx] != 0:
                             dist = torch.dist(y_pred[traj_idx],y_g[traj_idx]).item()
-                            # print("at frame", frame_idx+T_obs+1, "ped", traj_idx, "is off by", dist)
                             print(f"at frame {frame_idx+T_obs+1} ped {traj_idx} is off by {dist}\n")
                 print("================================================================")
 

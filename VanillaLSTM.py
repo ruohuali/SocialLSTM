@@ -197,6 +197,7 @@ def train(T_obs, T_pred):
                     #compute loss
                     Y_pred = output[T_obs+1:T_pred]
                     Y_g = Y[T_obs+1:T_pred]
+
                     cost = criterion(Y_pred, Y_g)
 
                     if epoch % 10 == 9:
@@ -252,14 +253,70 @@ def validate(model, T_obs, T_pred):
                     for traj_idx in range(part_masks[frame_idx].shape[1]):
                         if part_masks[frame_idx+T_obs+1][0][traj_idx] != 0:
                             dist = torch.dist(y_pred[traj_idx],y_g[traj_idx]).item()
-                            # print("at frame", frame_idx+T_obs+1, "ped", traj_idx, "is off by", dist)
                             print(f"at frame {frame_idx+T_obs+1} ped {traj_idx} is off by {dist}\n")
                 print("================================================================")
+
+
+
+from matplotlib.animation import FuncAnimation
+
+def animation():
+    dataset = FramesDataset("biwi_hotel_4.txt")
+    dataloader = DataLoader(dataset, batch_size=20)
+    traj_num = len(dataset.getTrajList())
+    
+    coord_data_tensor = dataset.file_data[:,:,2:]
+    coord_data = coord_data_tensor.cpu().data.numpy()
+
+    print(f"shape {coord_data.shape} {dataset.participant_masks.shape}")
+
+    x = []
+    y = []
+
+    X = np.arange(0,10)
+    Y = np.arange(0,10)
+    X1 = X[::-1]
+    Y1 = Y[:]
+
+    fig, ax = plt.subplots()
+    ax.set_xlim(-2,2)
+    ax.set_ylim(-2,2)
+
+    lines = []
+    for _ in range(traj_num):
+        line, = ax.plot(0,0)
+        lines.append(line)
+
+    # line, = ax.plot(0,0)
+    # line1, = ax.plot(0,0)
+    # lines = ax.plot(0,0)
+    # print(f"type {type(lines)} len {len(lines)} type {type(lines[0])}")
+    print("=============================================================")
+    def frame(i):
+        lines[0].set_xdata(coord_data[:i,2,0])
+        lines[0].set_ydata(coord_data[:i,2,1])
+        print("=============================================================")
+        print(f"plotting ({coord_data[i,2,0]},{coord_data[i,2,1]})")
+
+        # x.append(i*10)
+        # y.append(i)
+        # x.append(X[int(i)])
+        # y.append(Y[int(i)])    
+
+        # lines[0].set_xdata(X[:i])
+        # lines[0].set_ydata(Y[:i])
+        # lines[1].set_xdata(X1[:i])
+        # lines[1].set_ydata(Y1[:i])
+
+
+    ani = FuncAnimation(fig, func=frame, interval=1000, frames=np.arange(0,21))
+    plt.show()
 
 
 
 if __name__ == "__main__":
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     print(f"using {device}")
-    vl = train(12, 20)
-    validate(vl, 12, 20)
+    # vl = train(12, 20)
+    # validate(vl, 12, 20)
+    animation()
