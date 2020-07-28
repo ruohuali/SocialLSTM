@@ -144,7 +144,7 @@ class VanillaLSTM(nn.Module):
         self.Phi = Phi(dropout_prob=dropout_prob)
 
 
-    def forward(self, X, part_masks, all_h_t, all_c_t, T_obs, T_pred):
+    def forward(self, X, part_masks, all_h_t, all_c_t, Y, T_obs, T_pred):
         outputs = torch.empty(X.shape[0], X.shape[1], self.output_dim, device=device)
         for frame_idx, x in enumerate(X):      
             if frame_idx <= T_obs or frame_idx > T_pred:
@@ -156,6 +156,11 @@ class VanillaLSTM(nn.Module):
             part_mask = torch.t(part_masks[frame_idx]).expand(part_masks[frame_idx].shape[1], self.output_dim)
             outputs[frame_idx] = self.OutputLayer(all_h_t) * part_mask
 
+            if frame_idx > 3:
+                for traj_idx in torch.where(part_masks[frame_idx][0] != 0)[0]:
+                    if part_masks[frame_idx-3][0][traj_idx] == 0:
+                        outputs[frame_idx, traj_idx] = Y[frame_idx, traj_idx] 
+
         return outputs
 
 
@@ -163,11 +168,11 @@ class VanillaLSTM(nn.Module):
 def train(T_obs, T_pred):
     tic = time.time()
 
-    h_dim = 1024
-    batch_size = T_obs + T_pred
+    h_dim = 128
+    batch_size = T_pred
 
     #try to train this
-    dataset = FramesDataset("biwi_hotel_4.txt")
+    dataset = FramesDataset("crowds_zara02.txt")
     #a dataloader for now not sure how to use
     dataloader = DataLoader(dataset, batch_size=batch_size)
 
@@ -186,13 +191,13 @@ def train(T_obs, T_pred):
     print("training")
     plot_data = [[] for _ in range(len(dataset) // batch_size)]
     #sequentially go over the dataset batch_size by batch_size
-    for epoch in range(50):
+    for epoch in range(500):
         for batch_idx, (part_masks, (input_seq, Y)) in enumerate(dataloader):
             if batch_idx < len(dataset) // batch_size:
                 Y = Y[:,:,2:]
                 with torch.autograd.set_detect_anomaly(True):         
                     #forward prop
-                    output = vl(input_seq, part_masks, h, c, T_obs, T_pred)
+                    output = vl(input_seq, part_masks, h, c, Y, T_obs, T_pred)
 
                     #compute loss
                     Y_pred = output[T_obs+1:T_pred]
@@ -220,16 +225,19 @@ def train(T_obs, T_pred):
         plt.plot(np.arange(len(plot_data[0])), data)
     plt.savefig("costs1.png")
 
+    #save the model
+    torch.save(vl, "vl.pt")
+
     return vl
 
 
 def validate(model, T_obs, T_pred):
     #try to validate this
-    h_dim = 1024
+    h_dim = 128
 
-    batch_size = T_obs + T_pred
+    batch_size = T_pred
 
-    dataset = FramesDataset("biwi_hotel_4.txt")
+    dataset = FramesDataset("crowds_zara02.txt")
     #a dataloader for now not sure how to use
     dataloader = DataLoader(dataset, batch_size=batch_size)
 
@@ -243,80 +251,210 @@ def validate(model, T_obs, T_pred):
             with torch.autograd.set_detect_anomaly(True):         
                 print(f"batch {batch_idx}")
                 #forward prop
-                output = model(input_seq, part_masks, h, c, T_obs, T_pred)
+                output = model(input_seq, part_masks, h, c, Y, T_obs, T_pred)
 
                 #compute loss
                 Y_pred = output[T_obs+1:T_pred]
                 Y_g = Y[T_obs+1:T_pred]
 
+                dists_list = [np.array([]) for _ in range(traj_num)]
+                batch_parts = []
                 for frame_idx, (y_pred, y_g) in enumerate(zip(Y_pred, Y_g)):
                     for traj_idx in range(part_masks[frame_idx].shape[1]):
                         if part_masks[frame_idx+T_obs+1][0][traj_idx] != 0:
+                            if traj_idx not in batch_parts:
+                                batch_parts.append(traj_idx)
                             dist = torch.dist(y_pred[traj_idx],y_g[traj_idx]).item()
                             print(f"at frame {frame_idx+T_obs+1} ped {traj_idx} is off by {dist}\n")
+                            dists_list[traj_idx] = np.append(dists_list[traj_idx], dist)
+                
+                total_ADE = np.array([])
+                total_FDE = np.array([])
+                for batch_part in batch_parts:
+                    ADE = np.average(dists_list[batch_part])
+                    print(f"ADE of traj {batch_part} {ADE}")
+                    total_ADE = np.append(total_ADE, ADE)
+                    print(f"FDE of traj {batch_part} {dists_list[batch_part][-1]}")
+                    total_FDE = np.append(total_FDE, dists_list[batch_part][-1])
+                    print("------------------------------------------------------")
+
+                print(f"total ADE {np.average(total_ADE)}")
+                print(f"total FDE {np.average(total_FDE)}")
                 print("================================================================")
 
-
-
-from matplotlib.animation import FuncAnimation
-
-def animation():
-    dataset = FramesDataset("biwi_hotel_4.txt")
-    dataloader = DataLoader(dataset, batch_size=20)
-    traj_num = len(dataset.getTrajList())
+                if batch_idx == 1:
+                    plotting_data = (Y[:T_pred], Y[:T_obs+2], (Y_pred,Y_g), part_masks, traj_num, batch_idx)
     
-    coord_data_tensor = dataset.file_data[:,:,2:]
-    coord_data = coord_data_tensor.cpu().data.numpy()
-
-    print(f"shape {coord_data.shape} {dataset.participant_masks.shape}")
-
-    x = []
-    y = []
-
-    X = np.arange(0,10)
-    Y = np.arange(0,10)
-    X1 = X[::-1]
-    Y1 = Y[:]
-
-    fig, ax = plt.subplots()
-    ax.set_xlim(-2,2)
-    ax.set_ylim(-2,2)
-
-    lines = []
-    for _ in range(traj_num):
-        line, = ax.plot(0,0)
-        lines.append(line)
-
-    # line, = ax.plot(0,0)
-    # line1, = ax.plot(0,0)
-    # lines = ax.plot(0,0)
-    # print(f"type {type(lines)} len {len(lines)} type {type(lines[0])}")
-    print("=============================================================")
-    def frame(i):
-        lines[0].set_xdata(coord_data[:i,2,0])
-        lines[0].set_ydata(coord_data[:i,2,1])
-        print("=============================================================")
-        print(f"plotting ({coord_data[i,2,0]},{coord_data[i,2,1]})")
-
-        # x.append(i*10)
-        # y.append(i)
-        # x.append(X[int(i)])
-        # y.append(Y[int(i)])    
-
-        # lines[0].set_xdata(X[:i])
-        # lines[0].set_ydata(Y[:i])
-        # lines[1].set_xdata(X1[:i])
-        # lines[1].set_ydata(Y1[:i])
+    plotting_batch(*plotting_data)
 
 
-    ani = FuncAnimation(fig, func=frame, interval=1000, frames=np.arange(0,21))
-    plt.show()
+def plotting_file(path):
+    print(f"plotting {path}")
 
+    file_data = []
+    with open(path, 'r') as file:
+        for line in file:
+            line_data = [int(float(data)) if i < 2 else float(data) for i, data in enumerate(line.rsplit())]
+            line_data[2], line_data[3] = line_data[3], line_data[2]
+            file_data.append(line_data)
+
+    trajs = []
+    part_then = file_data[0][1]
+    traj_temp = []
+    for line in file_data:
+        if line[1] != part_then:
+            trajs.append(traj_temp)
+            part_then = line[1]
+            traj_temp = [line]
+        else:
+            traj_temp.append(line)
+
+    for i, line in enumerate(trajs):
+        if len(line) < 30:
+            trajs[i].append(line[-1])
+        if len(line) > 30:
+            trajs[i] = trajs[i][:21]    
+
+    trajs_np = np.array(trajs)
+    print(f"shape {trajs_np.shape}")
+
+    plt.figure()
+    for i in range(trajs_np.shape[1]):
+        plt.plot(trajs_np[i,:,3], trajs_np[i,:,2])    
+    plt.savefig("all_trajs.png")
+  
+    plt.figure()
+    for i in range(10):
+        plt.plot(trajs_np[i,:,3], trajs_np[i,:,2])    
+    plt.savefig("few_trajs.png")
+
+
+'''
+@param trajs~(frame_num of a batch x traj_num x 2)
+'''
+def plotting_batch(total_trajs, prev_trajs, batch_trajs, part_masks, traj_num, batch_idx):
+    #reform the trajs tensor to a list of each traj's pos at each frame
+    batch_trajs_pred = batch_trajs[0].cpu().data.numpy()
+    batch_trajs_g = batch_trajs[1].cpu().data.numpy()
+    trajs_pred_list = [np.array([]) for _ in range(traj_num)]
+    trajs_g_list = [np.array([]) for _ in range(traj_num)]
+    parts = []
+    for frame_idx, (trajs_pred, trajs_g) in enumerate(zip(batch_trajs_pred, batch_trajs_g)):
+        for traj_idx, (pos_pred, pos_g) in enumerate(zip(trajs_pred, trajs_g)):
+            if not (pos_g == np.array([0., 0.])).all() and not (pos_pred == np.array([0., 0.])).all():
+                if traj_idx not in parts:
+                    parts.append(traj_idx)
+                    trajs_pred_list[int(traj_idx)] = np.append(trajs_pred_list[int(traj_idx)], pos_g)   
+                    trajs_g_list[int(traj_idx)] = np.append(trajs_g_list[int(traj_idx)], pos_g)                                 
+                trajs_pred_list[int(traj_idx)] = np.append(trajs_pred_list[int(traj_idx)], pos_pred)
+                trajs_g_list[int(traj_idx)] = np.append(trajs_g_list[int(traj_idx)], pos_g)
+
+
+    # prev_trajs_np = prev_trajs.cpu().data.numpy()
+    # prev_trajs_list = [np.array([]) for _ in range(traj_num)]
+    # for frame_idx, p_trajs in enumerate(prev_trajs_np):
+    #     for traj_idx, pos in enumerate(p_trajs):
+    #         if (pos != np.array([0., 0.])).all():
+    #             prev_trajs_list[int(traj_idx)] = np.append(prev_trajs_list[int(traj_idx)], pos)  
+
+    total_trajs_np = total_trajs.cpu().data.numpy()
+    total_trajs_list = [np.array([]) for _ in range(traj_num)]
+    for frame_idx, p_trajs in enumerate(total_trajs_np):
+        for traj_idx, pos in enumerate(p_trajs):
+            if not (pos == np.array([0., 0.])).all():
+                total_trajs_list[int(traj_idx)] = np.append(total_trajs_list[int(traj_idx)], pos)
+
+    plt.figure()
+    for plot_idx, traj_idx in enumerate(parts):
+        print(f"plotting {traj_idx}")
+        total_x = total_trajs_list[traj_idx][::2]
+        total_y = total_trajs_list[traj_idx][1::2]
+        plt.plot(total_x, total_y, linestyle="dashed", label="total"+str(traj_idx), marker=".")
+        for i, (x, y) in enumerate(zip(total_x, total_y)):
+            if i < len(total_x)-1:
+                plt.arrow(x, y, (total_x[i+1] - x)/2, (total_y[i+1] - y)/2, head_width=0.03, head_length=0.07)
+        pred_x = trajs_pred_list[traj_idx][::2]
+        pred_y = trajs_pred_list[traj_idx][1::2]            
+        plt.plot(pred_x, pred_y, label="pred"+str(traj_idx), marker=".")
+        for i, (x, y) in enumerate(zip(pred_x, pred_y)):
+            if i < len(pred_x)-1:
+                plt.arrow(x, y, (pred_x[i+1] - x)/2, (pred_y[i+1] - y)/2, head_width=0.03, head_length=0.07)        
+        # plt.plot(trajs_g_list[traj_idx][::2], trajs_g_list[traj_idx][1::2], linestyle="dotted", label="g"+str(traj_idx), marker=".")
+        # plt.plot(prev_trajs_list[traj_idx][::2], prev_trajs_list[traj_idx][1::2], linestyle="dotted", label="prev"+str(traj_idx), marker=".")
+
+        ax = plt.gca()
+        #set limits
+        # ax.set_xlim([4,13.5])
+        for i in range(2*plot_idx, 2*plot_idx+2):
+            line = ax.lines[i]
+            print(f"{line.get_label()}\n{line.get_xydata()}\n-------------------------")
+        print("===============================")
+
+        plt.legend(loc="upper right")
+        plt.title(f"batch {batch_idx}")
+    plt.savefig("vl exp.png")
 
 
 if __name__ == "__main__":
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     print(f"using {device}")
-    # vl = train(12, 20)
-    # validate(vl, 12, 20)
+    vl = train(12, 20)
+    vl1 = torch.load("vl.pt")
+    validate(vl1, 12, 20)
     animation()
+    plotting_file("crowds_zara02.txt")
+
+
+# from matplotlib.animation import FuncAnimation
+
+# def animation():
+#     dataset = FramesDataset("biwi_hotel_4.txt")
+#     dataloader = DataLoader(dataset, batch_size=20)
+#     traj_num = len(dataset.getTrajList())
+    
+#     coord_data_tensor = dataset.file_data[:,:,2:]
+#     coord_data = coord_data_tensor.cpu().data.numpy()
+
+#     print(f"shape {coord_data.shape} {dataset.participant_masks.shape}")
+
+#     x = []
+#     y = []
+
+#     X = np.arange(0,10)
+#     Y = np.arange(0,10)
+#     X1 = X[::-1]
+#     Y1 = Y[:]
+
+#     fig, ax = plt.subplots()
+#     ax.set_xlim(-2,2)
+#     ax.set_ylim(-2,2)
+
+#     lines = []
+#     for _ in range(traj_num):
+#         line, = ax.plot(0,0)
+#         lines.append(line)
+
+#     # line, = ax.plot(0,0)
+#     # line1, = ax.plot(0,0)
+#     # lines = ax.plot(0,0)
+#     # print(f"type {type(lines)} len {len(lines)} type {type(lines[0])}")
+#     print("=============================================================")
+#     def frame(i):
+#         lines[0].set_xdata(coord_data[:i,2,0])
+#         lines[0].set_ydata(coord_data[:i,2,1])
+#         print("=============================================================")
+#         print(f"plotting ({coord_data[i,2,0]},{coord_data[i,2,1]})")
+
+#         # x.append(i*10)
+#         # y.append(i)
+#         # x.append(X[int(i)])
+#         # y.append(Y[int(i)])    
+
+#         # lines[0].set_xdata(X[:i])
+#         # lines[0].set_ydata(Y[:i])
+#         # lines[1].set_xdata(X1[:i])
+#         # lines[1].set_ydata(Y1[:i])
+
+
+#     ani = FuncAnimation(fig, func=frame, interval=1000, frames=np.arange(0,21))
+#     plt.show()
