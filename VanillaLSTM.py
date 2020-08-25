@@ -10,31 +10,22 @@ from torch.utils.data import Dataset, DataLoader
 import pdb 
 import time
 import matplotlib.pyplot as plt
+from os import listdir
+from os.path import isfile, join
+import warnings
 
 
 # %%
 class FramesDataset(Dataset):
-    '''
-    @func preprocess
-    @param path: relative path for the raw data
-    @note raw data~ col1: frame index, col2: traj index, (col3, col4): (y, x)
-    @return traj_list: indices for each trajactory in raw data
-            participants_masks~tensor(frame num x traj num): indicate the presence of each ped at each frame
-            file_data_tensors~tensor(frame num x traj num x 4): the position of each traj at each frame
-                                                                if not present default to (0,0)
-    '''
-    def preprocess(self, path):
-        file_data = []
-        with open(path, 'r') as file:
-            for line in file:
-                line_data = [int(float(data)) if i < 2 else float(data) for i, data in enumerate(line.rsplit())]
-                line_data[2], line_data[3] = line_data[3], line_data[2]
-                file_data.append(line_data)
-        file_data.sort(key=lambda data : data[0])
-
+    def text2Tensor(self, file_data):
+        #process the file data such that it's a list of lists of offset tuple in each time step
         file_data_t = []
         data_temp = []
-        frame_num = file_data[0][0]
+        try:
+            frame_num = file_data[0][0]
+        except IndexError:
+            print("???:")
+            print(file_data)
         traj_list = []
         frame_list = []
         for line in file_data:
@@ -45,14 +36,14 @@ class FramesDataset(Dataset):
                 data_temp = [line]
             else:    
                 data_temp.append(line)
+            #keep a traj list for all trajs
             if line[1] not in traj_list:
                 traj_list.append(line[1])
             if line[0] not in frame_list:
                 frame_list.append(line[0])
-            
         traj_list.sort()
-        frame_list.sort()
-
+        frame_list.sort()  
+        
         #get participants in each frame
         #@note here the elements are ped's index in the traj list
         participants = [[] for i in range(len(file_data_t))]
@@ -68,19 +59,57 @@ class FramesDataset(Dataset):
             file_data_t[frame_idx].sort(key=lambda data : data[1])
 
         file_data_tensors = torch.tensor(file_data_t, device=device)
-
+        
         participant_masks = []
         for frame_idx, line in enumerate(participants):
-            participant_masks.append([[torch.tensor(1.) if i in participants[frame_idx] else torch.tensor(0.) for i in range(len(traj_list)) ]])
+            participant_masks.append([[torch.tensor(1.) if i in participants[frame_idx] else torch.tensor(0.) for i in range(len(traj_list))]])
         participant_masks = torch.tensor(participant_masks, device=device)
-
-        return traj_list, participant_masks, file_data_tensors
+        
+        return traj_list, participant_masks, file_data_tensors              
+    
+    
+    '''
+    @func preprocess
+    @param path: relative path for the raw data
+    @note raw data~ col1: frame index, col2: traj index, (col3, col4): (y, x)
+    @return traj_list: indices for each trajactory in raw data
+            participants_masks~tensor(frame num x traj num): indicate the presence of each ped at each frame
+            file_data_tensors~tensor(frame num x traj num x 4): the position of each traj at each frame
+                                                                if not present default to (0,0)
+    '''
+    def preprocess(self, path):
+        #open the file as it is
+        file_data = []
+        with open(path, 'r') as file:
+            for line in file:
+                line_data = [int(float(data)) if i < 2 else float(data) for i, data in enumerate(line.rsplit())]
+                line_data[2], line_data[3] = line_data[3], line_data[2]
+                file_data.append(line_data)
+        file_data = sorted(file_data, key=lambda data : data[1])
+        file_data_sort = sorted(file_data, key=lambda data : data[0])
+        
+        traj_list, participant_masks, coord_tensors = self.text2Tensor(file_data_sort)
+        
+        #process the file data such that it contains the offsets not global coords
+        file_data_off = []
+        for i, line in enumerate(file_data):
+            if i > 0:
+                if file_data[i][1] == file_data[i-1][1]:
+                    file_data_off.append([file_data[i][0], file_data[i][1], file_data[i][2]-file_data[i-1][2], file_data[i][3]-file_data[i-1][3]])
+        file_data_off.sort(key=lambda data : data[0])        
+        
+        traj_list, participant_masks, off_tensors = self.text2Tensor(file_data_off)
+        
+        return traj_list, participant_masks, off_tensors, coord_tensors
+    
 
     def __init__(self, path):
-        self.traj_list, self.participant_masks, self.file_data = self.preprocess(path)
+        self.traj_list, self.participant_masks, self.off_data, self.coord_data = self.preprocess(path)
+        
 
     def __len__(self):
-        return len(self.file_data)
+        return len(self.off_data)
+    
 
     '''
     @note (X, Y) is a (file_data[idx], frame[idx+1]) pair if a single idx is provided
@@ -89,34 +118,69 @@ class FramesDataset(Dataset):
     the accompanying mask tensor follows the same rule 
     '''
     def __getitem__(self, idx):
-        if isinstance(idx, int):
-            if idx < len(self.file_data)-1:
-                Y_idx = idx+1
-            else:
-                Y_idx = len(self.file_data)-1
-
-        else:
-            if idx.start != None:
-                start = idx.start+1
-            else:
-                start = 0+1
-            if idx.stop != None:
-                stop = idx.stop+1
-            else:
-                stop = len(self.file_data)-1
-            Y_idx = slice(start, stop)
-
         participant_mask = self.participant_masks[idx]
-        X = self.file_data[idx]
-        Y = self.file_data[Y_idx]
+        X = self.off_data[idx]
+        Z = torch.zeros(*X.shape)
+        for coords in self.coord_data:
+            if coords[0][0] == X[0][0]:
+                Z = coords
+        ret_data = {}
+        ret_data["seq"] = X
+        ret_data["mask"] = participant_mask
+        ret_data["idx"] = idx
+        ret_data["coords"] = Z
+        return ret_data
 
-        return participant_mask, (X, Y)
-
+    
     def getTrajList(self):
         return self.traj_list
 
+    
     def getParticipants(self):
         return self.participant_mask
+    
+    
+    def getCoordinates(self, seq):
+        #get the coord data at the time step right before the seq starts
+        before_coords = torch.empty(len(self.traj_list), 4, device=device)
+        for x in seq:
+            for i, coords in enumerate(self.coord_data):
+                if coords[0][0] == x[0][0]:
+                    before_coords = self.coord_data[i-1]
+                    break
+            break
+        ret_data = torch.reshape(before_coords, (1, before_coords.shape[0], before_coords.shape[1])) 
+        #get the rest
+        for i, x in enumerate(seq):
+            for j, coords in enumerate(self.coord_data):
+                if coords[0][0] == x[0][0]:
+                    coords_reshaped = torch.reshape(coords.clone(), (1, before_coords.shape[0], before_coords.shape[1]))                     
+                    ret_data = torch.cat((ret_data, coords_reshaped), 0)
+                    break
+        return ret_data
+    
+    
+    
+    
+# device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+
+# D = FramesDataset("try_dataset.txt")
+# Dloader = DataLoader(D, batch_size=20)
+
+# for i, data in enumerate(Dloader):
+#     if i == 0:
+#         print(f"idx {data['idx']}")
+#         print(f"X {data['seq'].shape}\n")
+#         for i in data['seq']:
+#             print(i)
+#         print(f"mask\n {data['mask']}")
+#         print(f"coords {data['coords'].shape}\n")   
+#         for i in data['coords']:
+#             print(i)       
+#         print("\n\n\n\ntemp \n\n")
+#         temp = D.getCoordinates(data['seq'])
+#         for i in temp:
+#             print(i)
 
 
 # %%
@@ -147,16 +211,25 @@ class VanillaLSTM(nn.Module):
     def forward(self, X, part_masks, all_h_t, all_c_t, Y, T_obs, T_pred):
         outputs = torch.empty(X.shape[0], X.shape[1], self.output_dim, device=device)
         for frame_idx, x in enumerate(X):      
-            if frame_idx <= T_obs or frame_idx > T_pred:
+            if frame_idx > T_pred:
                 outputs[frame_idx] = torch.zeros(X.shape[1], self.output_dim)
                 continue
-
-            r = self.Phi(self.InputLayer(x[:,2:]))
-            all_h_t, all_c_t = self.LSTMCell(r, (all_h_t, all_c_t))
-            part_mask = torch.t(part_masks[frame_idx]).expand(part_masks[frame_idx].shape[1], self.output_dim)
-            outputs[frame_idx] = self.OutputLayer(all_h_t) * part_mask
-
-            if frame_idx > 3:
+                
+            elif frame_idx <= T_obs:
+                r = self.Phi(self.InputLayer(x[:,2:]))
+                all_h_t, all_c_t = self.LSTMCell(r, (all_h_t, all_c_t))
+                part_mask = torch.t(part_masks[frame_idx]).expand(part_masks[frame_idx].shape[1], self.output_dim)
+                outputs[frame_idx] = self.OutputLayer(all_h_t) * part_mask
+                
+            elif frame_idx > T_obs and frame_idx <= T_pred:
+                r = self.Phi(self.InputLayer(outputs[frame_idx-1].clone()))
+#                 r = self.Phi(self.InputLayer(outputs[frame_idx-1]))
+                all_h_t, all_c_t = self.LSTMCell(r, (all_h_t, all_c_t))
+                part_mask = torch.t(part_masks[frame_idx]).expand(part_masks[frame_idx].shape[1], self.output_dim)
+                outputs[frame_idx] = self.OutputLayer(all_h_t) * part_mask                
+                
+            #dirty fix for appearance that's too short
+            if frame_idx > 3 and frame_idx > T_obs:
                 for traj_idx in torch.where(part_masks[frame_idx][0] != 0)[0]:
                     if part_masks[frame_idx-3][0][traj_idx] == 0:
                         outputs[frame_idx, traj_idx] = Y[frame_idx, traj_idx] 
@@ -165,14 +238,53 @@ class VanillaLSTM(nn.Module):
 
 
 # %%
-def train(T_obs, T_pred):
-    tic = time.time()
+def trajPruningByAppear(part_mask, ratio=0.6, in_tensor=None):
+    if in_tensor != None:
+        #count appearance
+        for traj in range(in_tensor.shape[1]):
+            traj_mask = part_mask[:,0,traj]
+            count = traj_mask[traj_mask!=0].shape[0]
+            if count < part_mask.shape[0]*ratio:
+                in_tensor[:,traj,:] *= 0.
+        return in_tensor
+    else:
+        new_mask = part_mask.clone()
+        #count appearance
+        for traj in range(part_mask.shape[2]):
+            traj_mask = part_mask[:,0,traj]
+            count = traj_mask[traj_mask!=0].shape[0]
+            if count < part_mask.shape[0]*ratio:
+                new_mask[:,0,traj] *= 0.        
+        return new_mask
+    
+'''@note last elem in in_tensors must be the mask'''
+def trajPruningByStride(part_mask, ref_tensor, in_tensors, length=0.3):
+    for traj in range(ref_tensor.shape[1]):
+        actual_strides = ref_tensor[:,traj,2:]
+        avg_stride_len = torch.mean(torch.abs(actual_strides[actual_strides!=torch.zeros(2, device=device)]))
+        #if divide by zero means the traj never appears in the batch
+        if math.isnan(avg_stride_len):
+            continue
+        if avg_stride_len < length:
+            for i, in_tensor in enumerate(in_tensors):
+                if i == len(in_tensors)-1:
+                    in_tensors[i][:,0,traj] *= 0.
+                else:
+                    in_tensors[i][:,traj,:] *= 0.                    
+    return in_tensors
 
-    h_dim = 128
+
+# %%
+def train(T_obs, T_pred, file, model=None, name="model"):
+    tic = time.time()
+    print(f"training on {file}")    
+    
+    h_dim = 32
     batch_size = T_pred
 
     #try to train this
-    dataset = FramesDataset("crowds_zara02.txt")
+#     dataset = FramesDataset("crowds_zara02.txt")
+    dataset = FramesDataset(file)
     #a dataloader for now not sure how to use
     dataloader = DataLoader(dataset, batch_size=batch_size)
 
@@ -180,24 +292,41 @@ def train(T_obs, T_pred):
     h = torch.zeros(traj_num, h_dim, device=device)
     c = torch.zeros(traj_num, h_dim, device=device)
 
-    vl = VanillaLSTM(hidden_dim=h_dim, mediate_dim=100, output_dim=2, traj_num=traj_num)
+    if model == None:
+        print("instantiating model")
+        vl = VanillaLSTM(hidden_dim=h_dim, mediate_dim=24, output_dim=2, traj_num=traj_num)
+    else:
+        vl = model
     vl.to(device)
 
     #define loss & optimizer
     criterion = nn.MSELoss(reduction="sum")
     # criterion = Gaussian2DNll
-    optimizer = torch.optim.Adagrad(vl.parameters(), weight_decay=0.0005)
+#     optimizer = torch.optim.Adagrad(vl.parameters(), weight_decay=0.0005)
+    optimizer = torch.optim.Adam(vl.parameters(), weight_decay=0.0005)
+#     optimizer = torch.optim.SGD(vl.parameters(), lr=1e-4, weight_decay=0.0005)
 
-    print("training")
     plot_data = [[] for _ in range(len(dataset) // batch_size)]
     #sequentially go over the dataset batch_size by batch_size
-    for epoch in range(500):
-        for batch_idx, (part_masks, (input_seq, Y)) in enumerate(dataloader):
+    EPOCH = 50
+    for epoch in range(EPOCH):
+        print(f"epoch {epoch+1}/{EPOCH}  ")
+        for batch_idx, data in enumerate(dataloader):
+            print(f"batch {batch_idx+1}/{len(dataset) // batch_size} ", end='\r')
             if batch_idx < len(dataset) // batch_size:
-                Y = Y[:,:,2:]
-                with torch.autograd.set_detect_anomaly(True):         
+                Y = data['seq'][:T_pred][:T_pred,:,2:].clone()
+                input_seq = data['seq'][:T_pred].clone()
+                part_masks = data['mask']
+                with torch.autograd.set_detect_anomaly(True):
+                    #dirty truncate
+                    run_ratio = (T_obs+3)/T_pred
+                    input_seq = trajPruningByAppear(part_masks, ratio=run_ratio, in_tensor=input_seq) 
+                    Y = trajPruningByAppear(part_masks, ratio=run_ratio, in_tensor=Y)     
+                    pr_masks = trajPruningByAppear(part_masks, ratio=run_ratio)
+                    (input_seq, Y, pr_masks) = trajPruningByStride(pr_masks, input_seq, (input_seq, Y, pr_masks))               
+                    
                     #forward prop
-                    output = vl(input_seq, part_masks, h, c, Y, T_obs, T_pred)
+                    output = vl(input_seq, pr_masks, h, c, Y, T_obs, T_pred)
 
                     #compute loss
                     Y_pred = output[T_obs+1:T_pred]
@@ -217,244 +346,324 @@ def train(T_obs, T_pred):
                     optimizer.step()
 
     toc = time.time()
-    print(f"training consumed {toc-tic}\n")
+    print(f"training consumed {toc-tic}")
 
     #plot the cost
     plt.figure()
     for data in plot_data:
         plt.plot(np.arange(len(plot_data[0])), data)
-    plt.savefig("costs1.png")
-
+    
     #save the model
-    torch.save(vl, "vl.pt")
+    torch.save(vl, name)
+    print(f"saved model in {name}\n")    
 
     return vl
 
 
-def validate(model, T_obs, T_pred):
+# %%
+def validate(model, T_obs, T_pred, file):
     #try to validate this
-    h_dim = 128
+    h_dim = 32
 
     batch_size = T_pred
 
-    dataset = FramesDataset("crowds_zara02.txt")
+#     dataset = FramesDataset("crowds_zara02.txt")
+    dataset = FramesDataset(file)    
     #a dataloader for now not sure how to use
     dataloader = DataLoader(dataset, batch_size=batch_size)
 
     traj_num = len(dataset.getTrajList())
     h = torch.zeros(traj_num, h_dim, device=device)
     c = torch.zeros(traj_num, h_dim, device=device)
+    
+    plotting_batches = np.arange(40)
+    plotting_data = []
+    avgDispErrMeans = []
+    finalDispErrMeans = []    
     #validate the model based on the dataset
-    for batch_idx, (part_masks, (input_seq, Y)) in enumerate(dataloader):
+    print(f"validating on {file}")
+    for batch_idx, data in enumerate(dataloader):
         if batch_idx < len(dataset) // batch_size:
-            Y = Y[:,:,2:]
-            with torch.autograd.set_detect_anomaly(True):         
-                print(f"batch {batch_idx}")
+            Y = data['seq'][:T_pred,:,2:].clone()
+            input_seq = data['seq'][:T_pred].clone()
+            part_masks = data['mask']            
+            with torch.no_grad():         
+                print(f"batch {batch_idx+1}/{len(dataset) // batch_size}  ", end='\r')
+                #dirty truncate
+                run_ratio = (T_obs+3)/T_pred
+                input_seq = trajPruningByAppear(part_masks, ratio=run_ratio, in_tensor=input_seq) 
+                Y = trajPruningByAppear(part_masks, ratio=run_ratio, in_tensor=Y)     
+                pr_masks = trajPruningByAppear(part_masks, ratio=run_ratio)
+                (input_seq, Y, pr_masks) = trajPruningByStride(pr_masks, input_seq, (input_seq, Y, pr_masks))
+                
                 #forward prop
-                output = model(input_seq, part_masks, h, c, Y, T_obs, T_pred)
+                output = model(input_seq, pr_masks, h, c, Y, T_obs, T_pred)
 
-                #compute loss
+                #compute cost
                 Y_pred = output[T_obs+1:T_pred]
                 Y_g = Y[T_obs+1:T_pred]
+                #......
 
-                dists_list = [np.array([]) for _ in range(traj_num)]
-                batch_parts = []
-                for frame_idx, (y_pred, y_g) in enumerate(zip(Y_pred, Y_g)):
-                    for traj_idx in range(part_masks[frame_idx].shape[1]):
-                        if part_masks[frame_idx+T_obs+1][0][traj_idx] != 0:
-                            if traj_idx not in batch_parts:
-                                batch_parts.append(traj_idx)
-                            dist = torch.dist(y_pred[traj_idx],y_g[traj_idx]).item()
-                            print(f"at frame {frame_idx+T_obs+1} ped {traj_idx} is off by {dist}\n")
-                            dists_list[traj_idx] = np.append(dists_list[traj_idx], dist)
-                
-                total_ADE = np.array([])
-                total_FDE = np.array([])
-                for batch_part in batch_parts:
-                    ADE = np.average(dists_list[batch_part])
-                    print(f"ADE of traj {batch_part} {ADE}")
-                    total_ADE = np.append(total_ADE, ADE)
-                    print(f"FDE of traj {batch_part} {dists_list[batch_part][-1]}")
-                    total_FDE = np.append(total_FDE, dists_list[batch_part][-1])
-                    print("------------------------------------------------------")
+                #get and process result                
+                Y_pred_param = Y_pred.clone()
+                coords_param = dataset.getCoordinates(data['seq']).clone()
 
-                print(f"total ADE {np.average(total_ADE)}")
-                print(f"total FDE {np.average(total_FDE)}")
-                print("================================================================")
+                #save plotting data for visualization
+                if batch_idx in plotting_batches:
+                    plotting_data.append((Y_pred, part_masks, traj_num, batch_idx, dataset.getCoordinates(data['seq']), T_obs, True))
+                    plotting_data.append((Y_pred_param, part_masks, traj_num, batch_idx, dataset.getCoordinates(data['seq']), T_obs, False))                    
 
-                if batch_idx == 1:
-                    plotting_data = (Y[:T_pred], Y[:T_obs+2], (Y_pred,Y_g), part_masks, traj_num, batch_idx)
-    
-    plotting_batch(*plotting_data)
+                if batch_idx in range(len(dataset) // batch_size-1):
+                    err = avgDispError(Y_pred_param, part_masks, traj_num, batch_idx, dataset.getCoordinates(data['seq']), T_obs)
+                    avgDispErrMeans.append(err)
+
+                if batch_idx in range(len(dataset) // batch_size-1):
+                    err = finalDispError(Y_pred_param, part_masks, traj_num, batch_idx, dataset.getCoordinates(data['seq']), T_obs)
+                    finalDispErrMeans.append(err)                
+        
+    for d in plotting_data:
+        plotting_batch(*d)
+        
+    print("total avg disp mean ", np.sum(np.array(avgDispErrMeans))/len([v for v in avgDispErrMeans if v != 0]))
+    print("total final disp mean ", np.sum(np.array(finalDispErrMeans))/len([v for v in finalDispErrMeans if v != 0]))    
 
 
-def plotting_file(path):
-    print(f"plotting {path}")
-
-    file_data = []
-    with open(path, 'r') as file:
-        for line in file:
-            line_data = [int(float(data)) if i < 2 else float(data) for i, data in enumerate(line.rsplit())]
-            line_data[2], line_data[3] = line_data[3], line_data[2]
-            file_data.append(line_data)
-
-    trajs = []
-    part_then = file_data[0][1]
-    traj_temp = []
-    for line in file_data:
-        if line[1] != part_then:
-            trajs.append(traj_temp)
-            part_then = line[1]
-            traj_temp = [line]
-        else:
-            traj_temp.append(line)
-
-    for i, line in enumerate(trajs):
-        if len(line) < 30:
-            trajs[i].append(line[-1])
-        if len(line) > 30:
-            trajs[i] = trajs[i][:21]    
-
-    trajs_np = np.array(trajs)
-    print(f"shape {trajs_np.shape}")
-
-    plt.figure()
-    for i in range(trajs_np.shape[1]):
-        plt.plot(trajs_np[i,:,3], trajs_np[i,:,2])    
-    plt.savefig("all_trajs.png")
-  
-    plt.figure()
-    for i in range(10):
-        plt.plot(trajs_np[i,:,3], trajs_np[i,:,2])    
-    plt.savefig("few_trajs.png")
-
-
+# %%
 '''
 @param trajs~(frame_num of a batch x traj_num x 2)
 '''
-def plotting_batch(total_trajs, prev_trajs, batch_trajs, part_masks, traj_num, batch_idx):
+def plotting_batch(batch_trajs_pred_gpu, part_masks, traj_num, batch_idx, coord_data, T_obs, is_total):          
     #reform the trajs tensor to a list of each traj's pos at each frame
-    batch_trajs_pred = batch_trajs[0].cpu().data.numpy()
-    batch_trajs_g = batch_trajs[1].cpu().data.numpy()
+    batch_trajs_pred = batch_trajs_pred_gpu.cpu().data.numpy()
     trajs_pred_list = [np.array([]) for _ in range(traj_num)]
-    trajs_g_list = [np.array([]) for _ in range(traj_num)]
     parts = []
-    for frame_idx, (trajs_pred, trajs_g) in enumerate(zip(batch_trajs_pred, batch_trajs_g)):
-        for traj_idx, (pos_pred, pos_g) in enumerate(zip(trajs_pred, trajs_g)):
-            if not (pos_g == np.array([0., 0.])).all() and not (pos_pred == np.array([0., 0.])).all():
+    for frame_idx, trajs_pred in enumerate(batch_trajs_pred):
+        for traj_idx, pos_pred in enumerate(trajs_pred):
+            if not (pos_pred == np.array([0., 0.])).all():
                 if traj_idx not in parts:
                     parts.append(traj_idx)
-                    trajs_pred_list[int(traj_idx)] = np.append(trajs_pred_list[int(traj_idx)], pos_g)   
-                    trajs_g_list[int(traj_idx)] = np.append(trajs_g_list[int(traj_idx)], pos_g)                                 
-                trajs_pred_list[int(traj_idx)] = np.append(trajs_pred_list[int(traj_idx)], pos_pred)
-                trajs_g_list[int(traj_idx)] = np.append(trajs_g_list[int(traj_idx)], pos_g)
-
-
-    # prev_trajs_np = prev_trajs.cpu().data.numpy()
-    # prev_trajs_list = [np.array([]) for _ in range(traj_num)]
-    # for frame_idx, p_trajs in enumerate(prev_trajs_np):
-    #     for traj_idx, pos in enumerate(p_trajs):
-    #         if (pos != np.array([0., 0.])).all():
-    #             prev_trajs_list[int(traj_idx)] = np.append(prev_trajs_list[int(traj_idx)], pos)  
-
-    total_trajs_np = total_trajs.cpu().data.numpy()
-    total_trajs_list = [np.array([]) for _ in range(traj_num)]
-    for frame_idx, p_trajs in enumerate(total_trajs_np):
-        for traj_idx, pos in enumerate(p_trajs):
-            if not (pos == np.array([0., 0.])).all():
-                total_trajs_list[int(traj_idx)] = np.append(total_trajs_list[int(traj_idx)], pos)
-
-    plt.figure()
-    for plot_idx, traj_idx in enumerate(parts):
-        print(f"plotting {traj_idx}")
-        total_x = total_trajs_list[traj_idx][::2]
-        total_y = total_trajs_list[traj_idx][1::2]
-        plt.plot(total_x, total_y, linestyle="dashed", label="total"+str(traj_idx), marker=".")
-        for i, (x, y) in enumerate(zip(total_x, total_y)):
-            if i < len(total_x)-1:
-                plt.arrow(x, y, (total_x[i+1] - x)/2, (total_y[i+1] - y)/2, head_width=0.03, head_length=0.07)
-        pred_x = trajs_pred_list[traj_idx][::2]
-        pred_y = trajs_pred_list[traj_idx][1::2]            
+                    trajs_pred_list[int(traj_idx)] = np.array(pos_pred)  
+                else:
+                    trajs_pred_list[int(traj_idx)] = np.vstack((trajs_pred_list[int(traj_idx)], pos_pred))
+            
+    #calc the coords of each step for plotting
+    batch_coords = coord_data.cpu().data.numpy()
+    split_points = np.array(batch_coords[T_obs+1,:,2:])    
+    trajs_pred_coords = []
+    for traj_idx, traj in enumerate(trajs_pred_list):
+        traj_pred_coord = np.array(split_points[traj_idx])
+        temp_point = np.array(split_points[traj_idx])
+        for off in traj:
+            next_point = temp_point + off
+            traj_pred_coord = np.vstack((traj_pred_coord, next_point))
+            temp_point = next_point
+        trajs_pred_coords.append(traj_pred_coord)
+        
+    #plot
+    plt.figure(figsize=(12,12))
+    plot_idx = 0
+    for traj_idx in parts:
+        try:
+            pred_x = trajs_pred_coords[traj_idx][:,0]
+        except IndexError:
+            print("not enough appearance")
+            continue
+        pred_y = trajs_pred_coords[traj_idx][:,1]            
         plt.plot(pred_x, pred_y, label="pred"+str(traj_idx), marker=".")
         for i, (x, y) in enumerate(zip(pred_x, pred_y)):
             if i < len(pred_x)-1:
-                plt.arrow(x, y, (pred_x[i+1] - x)/2, (pred_y[i+1] - y)/2, head_width=0.03, head_length=0.07)        
-        # plt.plot(trajs_g_list[traj_idx][::2], trajs_g_list[traj_idx][1::2], linestyle="dotted", label="g"+str(traj_idx), marker=".")
-        # plt.plot(prev_trajs_list[traj_idx][::2], prev_trajs_list[traj_idx][1::2], linestyle="dotted", label="prev"+str(traj_idx), marker=".")
+                try:
+                    plt.arrow(x, y, (pred_x[i+1] - x)/2, (pred_y[i+1] - y)/2, width=0.0001, head_width=0.001, head_length=0.001)    
+                except IndexError:
+                    print("plot error")
 
-        ax = plt.gca()
-        #set limits
-        # ax.set_xlim([4,13.5])
-        for i in range(2*plot_idx, 2*plot_idx+2):
-            line = ax.lines[i]
-            print(f"{line.get_label()}\n{line.get_xydata()}\n-------------------------")
-        print("===============================")
+        total_x = batch_coords[:,traj_idx,2]        
+        total_x = total_x[np.where(total_x != 0.)]
+        total_y = batch_coords[:,traj_idx,3]
+        total_y = total_y[np.where(total_y != 0.)]       
+        try:
+            plt.plot(total_x, total_y, linestyle="dashed", label="total"+str(traj_idx), marker=".")
+        except ValueError:
+            print("plot error")
+            
+        for i, (x, y) in enumerate(zip(total_x, total_y)):
+            if i < len(total_x)-1:
+                try:
+                    plt.arrow(x, y, (total_x[i+1] - x)/2, (total_y[i+1] - y)/2, width=0.0001, head_width=0.001, head_length=0.001)
+                except IndexError:
+                    print("plot error")
+        plot_idx += 1
+ 
+    plt.legend(loc="upper right")
+    plt.title(f"batch {batch_idx}")
+    plt.savefig("eth_plots/"+str(batch_idx)+str(is_total))
+    
+    
+def avgDispError(batch_trajs_pred_gpu, part_masks, traj_num, batch_idx, coord_data, T_obs):
+    #reform the trajs tensor to a list of each traj's pos at each frame
+    batch_trajs_pred = batch_trajs_pred_gpu.cpu().data.numpy()
+    trajs_pred_list = [np.array([]) for _ in range(traj_num)]
+    parts = []
+    for frame_idx, trajs_pred in enumerate(batch_trajs_pred):
+        for traj_idx, pos_pred in enumerate(trajs_pred):
+            if not (pos_pred == np.array([0., 0.])).all():
+                if traj_idx not in parts:
+                    parts.append(traj_idx)
+                    trajs_pred_list[int(traj_idx)] = np.array(pos_pred)  
+                else:
+                    trajs_pred_list[int(traj_idx)] = np.vstack((trajs_pred_list[int(traj_idx)], pos_pred))
+            
+    #calc the coords of each step
+    batch_coords = coord_data.cpu().data.numpy()
+    split_points = np.array(batch_coords[T_obs+1,:,2:])    
+    trajs_pred_coords = []
+    for traj_idx, traj in enumerate(trajs_pred_list):
+        traj_pred_coord = np.array(split_points[traj_idx])
+        temp_point = np.array(split_points[traj_idx])
+        for off in traj:
+            next_point = temp_point + off
+            traj_pred_coord = np.vstack((traj_pred_coord, next_point))
+            temp_point = next_point
+        trajs_pred_coords.append(traj_pred_coord)   
+        
+    
+    #compare
+    trajs_dist = []
+    step_num = 0
+    for traj_idx, traj in enumerate(parts):
+        T_valid = T_obs+1+trajs_pred_coords[traj].shape[0]
+        diff = batch_coords[T_obs+1:T_valid,traj,2:] - trajs_pred_coords[traj]
+        traj_dist = np.sum(np.linalg.norm(diff, axis=1))        
+        if not math.isnan(traj_dist):
+            trajs_dist.append(traj_dist)
+            step_num += diff.shape[0]
 
-        plt.legend(loc="upper right")
-        plt.title(f"batch {batch_idx}")
-    plt.savefig("vl exp.png")
+    if len(trajs_dist) != 0:
+        mean_of_trajs_mean = np.sum(np.array(trajs_dist))/step_num
+    else:
+        mean_of_trajs_mean = 0
+ 
+    print(f"avgDispError {mean_of_trajs_mean}")
+    return mean_of_trajs_mean
 
 
+def finalDispError(batch_trajs_pred_gpu, part_masks, traj_num, batch_idx, coord_data, T_obs):
+    #reform the trajs tensor to a list of each traj's pos at each frame
+    batch_trajs_pred = batch_trajs_pred_gpu.cpu().data.numpy()
+    trajs_pred_list = [np.array([]) for _ in range(traj_num)]
+    parts = []
+    for frame_idx, trajs_pred in enumerate(batch_trajs_pred):
+        for traj_idx, pos_pred in enumerate(trajs_pred):
+            if not (pos_pred == np.array([0., 0.])).all():
+                if traj_idx not in parts:
+                    parts.append(traj_idx)
+                    trajs_pred_list[int(traj_idx)] = np.array(pos_pred)  
+                else:
+                    trajs_pred_list[int(traj_idx)] = np.vstack((trajs_pred_list[int(traj_idx)], pos_pred))
+            
+    #calc the coords of each step
+    batch_coords = coord_data.cpu().data.numpy()
+    split_points = np.array(batch_coords[T_obs+1,:,2:])    
+    trajs_pred_coords = []
+    for traj_idx, traj in enumerate(trajs_pred_list):
+        traj_pred_coord = np.array(split_points[traj_idx])
+        temp_point = np.array(split_points[traj_idx])
+        for off in traj:
+            next_point = temp_point + off
+            traj_pred_coord = np.vstack((traj_pred_coord, next_point))
+            temp_point = next_point
+        trajs_pred_coords.append(traj_pred_coord)   
+        
+    
+    #compare
+    trajs_dist = []
+    for traj_idx, traj in enumerate(parts):
+        T_valid = T_obs+1+trajs_pred_coords[traj].shape[0]
+        diff = batch_coords[T_obs+1:T_valid,traj,2:] - trajs_pred_coords[traj]
+        final_diff = diff[-1]
+        traj_dist = np.linalg.norm(final_diff)       
+        if not math.isnan(traj_dist):
+            trajs_dist.append(traj_dist)
+
+    if len(trajs_dist) != 0:
+        mean_of_trajs_final = np.mean(np.array(trajs_dist))
+    else:
+        mean_of_trajs_final = 0
+ 
+    print(f"finalDispError {mean_of_trajs_final}")
+    return mean_of_trajs_final
+
+
+# %%
 if __name__ == "__main__":
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-    print(f"using {device}")
-    vl = train(12, 20)
-    vl1 = torch.load("vl.pt")
-    validate(vl1, 12, 20)
-    animation()
-    plotting_file("crowds_zara02.txt")
+    print(f"device {device}\n") 
 
-
-# from matplotlib.animation import FuncAnimation
-
-# def animation():
-#     dataset = FramesDataset("biwi_hotel_4.txt")
-#     dataloader = DataLoader(dataset, batch_size=20)
-#     traj_num = len(dataset.getTrajList())
+#     train_datasets = ["datasets/eth/train",
+#                       "datasets/hotel/train",               
+#                       "datasets/univ/train",
+#                       "datasets/zara1/train",
+#                       "datasets/zara2/train"
+#                      ]
+#     val_datasets = ["datasets/eth/test",
+#                     "datasets/hotel/test",               
+#                     "datasets/univ/test",
+#                     "datasets/zara1/test",
+#                     "datasets/zara2/test"
+#                     ]
+#     names = ["eth_vl.pt",
+#              "hotel_vl.pt",
+#              "univ_vl.pt",
+#              "zara1_vl.pt",
+#              "zara2_vl.pt"
+#             ]
     
-#     coord_data_tensor = dataset.file_data[:,:,2:]
-#     coord_data = coord_data_tensor.cpu().data.numpy()
+#     for train_dataset, val_dataset, name in zip(train_datasets, val_datasets, names):
+#         #preparing training set
+#         files_dir = train_dataset
+#         print(f"pulling from dir {files_dir}")
+#         files = [join(files_dir, f) for f in listdir(files_dir) if isfile(join(files_dir, f))]
+#         vl = None
+#         #training
+#         for file in files:
+#             vl = train(8, 20, file, model=vl, name=name)
 
-#     print(f"shape {coord_data.shape} {dataset.participant_masks.shape}")
+#         vl1 = torch.load(name)
+#         print(f"loading from {name}")
+#     #     validate(vl1, 8, 20, "try_dataset.txt")       
+#         #preparing validating set
+#         files_dir = val_dataset
+#         print(f"pulling from dir {files_dir}")        
+#         files = [join(files_dir, f) for f in listdir(files_dir) if isfile(join(files_dir, f))]
+#         #validating
+#         for file in files:
+#             validate(vl1, 8, 20, file)   
+            
+#         print("====================================")
 
-#     x = []
-#     y = []
+#     files_dir = "datasets/eth/train"
+#     name = "eth_vl.pt"
+#     print(f"pulling from dir {files_dir}")
+#     files = [join(files_dir, f) for f in listdir(files_dir) if isfile(join(files_dir, f))]
+#     vl = None
+#     #training
+#     for file in files:
+#         vl = train(8, 20, file, model=vl, name=name)
 
-#     X = np.arange(0,10)
-#     Y = np.arange(0,10)
-#     X1 = X[::-1]
-#     Y1 = Y[:]
-
-#     fig, ax = plt.subplots()
-#     ax.set_xlim(-2,2)
-#     ax.set_ylim(-2,2)
-
-#     lines = []
-#     for _ in range(traj_num):
-#         line, = ax.plot(0,0)
-#         lines.append(line)
-
-#     # line, = ax.plot(0,0)
-#     # line1, = ax.plot(0,0)
-#     # lines = ax.plot(0,0)
-#     # print(f"type {type(lines)} len {len(lines)} type {type(lines[0])}")
-#     print("=============================================================")
-#     def frame(i):
-#         lines[0].set_xdata(coord_data[:i,2,0])
-#         lines[0].set_ydata(coord_data[:i,2,1])
-#         print("=============================================================")
-#         print(f"plotting ({coord_data[i,2,0]},{coord_data[i,2,1]})")
-
-#         # x.append(i*10)
-#         # y.append(i)
-#         # x.append(X[int(i)])
-#         # y.append(Y[int(i)])    
-
-#         # lines[0].set_xdata(X[:i])
-#         # lines[0].set_ydata(Y[:i])
-#         # lines[1].set_xdata(X1[:i])
-#         # lines[1].set_ydata(Y1[:i])
+#     torch.cuda.empty_cache()
+#     vl1 = torch.load("eth_vl.pt")
+#     print(f"loading from eth_vl.pt")
+# #     validate(vl1, 8, 20, "try_dataset.txt")       
+#     #preparing validating set
+#     files_dir = "datasets/eth/test"
+#     print(f"pulling from dir {files_dir}")        
+#     files = [join(files_dir, f) for f in listdir(files_dir) if isfile(join(files_dir, f))]
+#     #validating
+#     for file in files:
+#         validate(vl1, 8, 20, file) 
 
 
-#     ani = FuncAnimation(fig, func=frame, interval=1000, frames=np.arange(0,21))
-#     plt.show()
+    temp = train(8, 20, "datasets/eth/test/biwi_eth.txt")
+    validate(temp, 8, 20, "datasets/eth/test/biwi_eth.txt")
+
+
