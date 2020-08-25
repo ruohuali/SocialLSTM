@@ -279,7 +279,7 @@ def train(T_obs, T_pred, file, model=None, name="model"):
     tic = time.time()
     print(f"training on {file}")    
     
-    h_dim = 32
+    h_dim = 12
     batch_size = T_pred
 
     #try to train this
@@ -294,7 +294,7 @@ def train(T_obs, T_pred, file, model=None, name="model"):
 
     if model == None:
         print("instantiating model")
-        vl = VanillaLSTM(hidden_dim=h_dim, mediate_dim=24, output_dim=2, traj_num=traj_num)
+        vl = VanillaLSTM(hidden_dim=h_dim, mediate_dim=8, output_dim=2, traj_num=traj_num)
     else:
         vl = model
     vl.to(device)
@@ -364,7 +364,7 @@ def train(T_obs, T_pred, file, model=None, name="model"):
 # %%
 def validate(model, T_obs, T_pred, file):
     #try to validate this
-    h_dim = 32
+    h_dim = 12
 
     batch_size = T_pred
 
@@ -642,29 +642,29 @@ if __name__ == "__main__":
             
 #         print("====================================")
 
-    files_dir = "datasets/eth/train"
-    name = "eth_vl.pt"
-    print(f"pulling from dir {files_dir}")
-    files = [join(files_dir, f) for f in listdir(files_dir) if isfile(join(files_dir, f))]
-    vl = None
-    #training
-    for file in files:
-        vl = train(8, 20, file, model=vl, name=name)
+#    files_dir = "datasets/eth/train"
+#    name = "eth_vl.pt"
+#    print(f"pulling from dir {files_dir}")
+#    files = [join(files_dir, f) for f in listdir(files_dir) if isfile(join(files_dir, f))]
+#    vl = None
+#    #training
+#    for file in files:
+#        vl = train(8, 20, file, model=vl, name=name)
 
-    torch.cuda.empty_cache()
-    vl1 = torch.load("eth_vl.pt")
-    print(f"loading from eth_vl.pt")
- #    validate(vl1, 8, 20, "try_dataset.txt")       
-    #preparing validating set
-    files_dir = "datasets/eth/test"
-    print(f"pulling from dir {files_dir}")        
-    files = [join(files_dir, f) for f in listdir(files_dir) if isfile(join(files_dir, f))]
-    #validating
-    for file in files:
-        validate(vl1, 8, 20, file) 
+#    torch.cuda.empty_cache()
+#    vl1 = torch.load("eth_vl.pt")
+#    print(f"loading from eth_vl.pt")
+# #    validate(vl1, 8, 20, "try_dataset.txt")       
+#    #preparing validating set
+#    files_dir = "datasets/eth/test"
+#    print(f"pulling from dir {files_dir}")        
+#    files = [join(files_dir, f) for f in listdir(files_dir) if isfile(join(files_dir, f))]
+#    #validating
+#    for file in files:
+#        validate(vl1, 8, 20, file) 
 
 
-    #temp = train(8, 20, "datasets/eth/test/biwi_eth.txt")
-    #validate(temp, 8, 20, "datasets/eth/test/biwi_eth.txt")
+    temp = train(8, 20, "datasets/eth/test/biwi_eth.txt")
+    validate(temp, 8, 20, "datasets/eth/test/biwi_eth.txt")
 
 
