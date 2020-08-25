@@ -308,7 +308,7 @@ def train(T_obs, T_pred, file, model=None, name="model"):
 
     plot_data = [[] for _ in range(len(dataset) // batch_size)]
     #sequentially go over the dataset batch_size by batch_size
-    EPOCH = 50
+    EPOCH = 70
     for epoch in range(EPOCH):
         print(f"epoch {epoch+1}/{EPOCH}  ")
         for batch_idx, data in enumerate(dataloader):
@@ -350,9 +350,10 @@ def train(T_obs, T_pred, file, model=None, name="model"):
 
     #plot the cost
     plt.figure()
-    for data in plot_data:
+    for i,data in enumerate(plot_data):
         plt.plot(np.arange(len(plot_data[0])), data)
-    
+    plt.savefig("eth_plots/"+"train"+str(i))
+
     #save the model
     torch.save(vl, name)
     print(f"saved model in {name}\n")    
@@ -641,29 +642,29 @@ if __name__ == "__main__":
             
 #         print("====================================")
 
-#     files_dir = "datasets/eth/train"
-#     name = "eth_vl.pt"
-#     print(f"pulling from dir {files_dir}")
-#     files = [join(files_dir, f) for f in listdir(files_dir) if isfile(join(files_dir, f))]
-#     vl = None
-#     #training
-#     for file in files:
-#         vl = train(8, 20, file, model=vl, name=name)
+    files_dir = "datasets/eth/train"
+    name = "eth_vl.pt"
+    print(f"pulling from dir {files_dir}")
+    files = [join(files_dir, f) for f in listdir(files_dir) if isfile(join(files_dir, f))]
+    vl = None
+    #training
+    for file in files:
+        vl = train(8, 20, file, model=vl, name=name)
 
-#     torch.cuda.empty_cache()
-#     vl1 = torch.load("eth_vl.pt")
-#     print(f"loading from eth_vl.pt")
-# #     validate(vl1, 8, 20, "try_dataset.txt")       
-#     #preparing validating set
-#     files_dir = "datasets/eth/test"
-#     print(f"pulling from dir {files_dir}")        
-#     files = [join(files_dir, f) for f in listdir(files_dir) if isfile(join(files_dir, f))]
-#     #validating
-#     for file in files:
-#         validate(vl1, 8, 20, file) 
+    torch.cuda.empty_cache()
+    vl1 = torch.load("eth_vl.pt")
+    print(f"loading from eth_vl.pt")
+ #    validate(vl1, 8, 20, "try_dataset.txt")       
+    #preparing validating set
+    files_dir = "datasets/eth/test"
+    print(f"pulling from dir {files_dir}")        
+    files = [join(files_dir, f) for f in listdir(files_dir) if isfile(join(files_dir, f))]
+    #validating
+    for file in files:
+        validate(vl1, 8, 20, file) 
 
 
-    temp = train(8, 20, "datasets/eth/test/biwi_eth.txt")
-    validate(temp, 8, 20, "datasets/eth/test/biwi_eth.txt")
+    #temp = train(8, 20, "datasets/eth/test/biwi_eth.txt")
+    #validate(temp, 8, 20, "datasets/eth/test/biwi_eth.txt")
 
 
