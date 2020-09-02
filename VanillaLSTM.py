@@ -308,7 +308,7 @@ def train(T_obs, T_pred, file, model=None, name="model.pt"):
 
     plot_data = [[] for _ in range(len(dataset) // batch_size)]
     #sequentially go over the dataset batch_size by batch_size
-    EPOCH = 10
+    EPOCH = 30
     for epoch in range(EPOCH):
         print(f"epoch {epoch+1}/{EPOCH}  ")
         for batch_idx, data in enumerate(dataloader):
