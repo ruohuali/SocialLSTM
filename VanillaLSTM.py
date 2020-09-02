@@ -279,7 +279,7 @@ def train(T_obs, T_pred, file, model=None, name="model.pt"):
     tic = time.time()
     print(f"training on {file}")    
     
-    h_dim = 6
+    h_dim = 128
     batch_size = T_pred
 
     #try to train this
@@ -294,7 +294,7 @@ def train(T_obs, T_pred, file, model=None, name="model.pt"):
 
     if model == None:
         print("instantiating model")
-        vl = VanillaLSTM(hidden_dim=h_dim, mediate_dim=6, output_dim=2, traj_num=traj_num)
+        vl = VanillaLSTM(hidden_dim=h_dim, mediate_dim=100, output_dim=2, traj_num=traj_num)
     else:
         vl = model
     vl.to(device)
@@ -303,7 +303,7 @@ def train(T_obs, T_pred, file, model=None, name="model.pt"):
     criterion = nn.MSELoss(reduction="sum")
     # criterion = Gaussian2DNll
 #     optimizer = torch.optim.Adagrad(vl.parameters(), weight_decay=0.0005)
-    optimizer = torch.optim.Adam(vl.parameters(), weight_decay=0.0005)
+    optimizer = torch.optim.Adam(vl.parameters(), weight_decay=0.01)
 #     optimizer = torch.optim.SGD(vl.parameters(), lr=1e-4, weight_decay=0.0005)
 
     plot_data = [[] for _ in range(len(dataset) // batch_size)]
@@ -370,7 +370,7 @@ def train(T_obs, T_pred, file, model=None, name="model.pt"):
 # %%
 def validate(model, T_obs, T_pred, file):
     #try to validate this
-    h_dim = 6
+    h_dim = 128
 
     batch_size = T_pred
 
