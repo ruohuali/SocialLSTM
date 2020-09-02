@@ -279,7 +279,7 @@ def train(T_obs, T_pred, file, model=None, name="model.pt"):
     tic = time.time()
     print(f"training on {file}")    
     
-    h_dim = 24
+    h_dim = 6
     batch_size = T_pred
 
     #try to train this
@@ -294,7 +294,7 @@ def train(T_obs, T_pred, file, model=None, name="model.pt"):
 
     if model == None:
         print("instantiating model")
-        vl = VanillaLSTM(hidden_dim=h_dim, mediate_dim=30, output_dim=2, traj_num=traj_num)
+        vl = VanillaLSTM(hidden_dim=h_dim, mediate_dim=6, output_dim=2, traj_num=traj_num)
     else:
         vl = model
     vl.to(device)
@@ -308,7 +308,7 @@ def train(T_obs, T_pred, file, model=None, name="model.pt"):
 
     plot_data = [[] for _ in range(len(dataset) // batch_size)]
     #sequentially go over the dataset batch_size by batch_size
-    EPOCH = 30
+    EPOCH = 10
     for epoch in range(EPOCH):
         print(f"epoch {epoch+1}/{EPOCH}  ")
         for batch_idx, data in enumerate(dataloader):
@@ -370,7 +370,7 @@ def train(T_obs, T_pred, file, model=None, name="model.pt"):
 # %%
 def validate(model, T_obs, T_pred, file):
     #try to validate this
-    h_dim = 24
+    h_dim = 6
 
     batch_size = T_pred
 
@@ -503,7 +503,7 @@ def plotting_batch(batch_trajs_pred_gpu, part_masks, traj_num, batch_idx, coord_
  
     plt.legend(loc="upper right")
     plt.title(f"batch {batch_idx}")
-    plt.savefig("eth_plots/"+str(batch_idx)+str(is_total)+"8_12")
+    plt.savefig("eth_plots/"+str(batch_idx)+str(is_total)+"6_6fs")
     
     
 def avgDispError(batch_trajs_pred_gpu, part_masks, traj_num, batch_idx, coord_data, T_obs):
@@ -672,6 +672,6 @@ if __name__ == "__main__":
 
     temp = train(8, 20, "datasets/eth/test/biwi_eth.txt")
     validate(temp, 8, 20, "datasets/eth/test/biwi_eth.txt")
-    temp1 = torch.load("model.pt")
-    validate(temp1, 8, 20, "datasets/hotel/test/biwi_hotel.txt")
+    #temp1 = torch.load("model.pt")
+    #validate(temp1, 8, 20, "datasets/hotel/test/biwi_hotel.txt")
 
