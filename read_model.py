@@ -14,7 +14,7 @@ def showParams(path):
 
 
 def showError(path):
-    for 
+    
 
 
 if __name__ == "__main__":
