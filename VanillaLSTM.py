@@ -279,7 +279,7 @@ def train(T_obs, T_pred, file, model=None, name="model"):
     tic = time.time()
     print(f"training on {file}")    
     
-    h_dim = 6
+    h_dim = 12
     batch_size = T_pred
 
     #try to train this
@@ -294,7 +294,7 @@ def train(T_obs, T_pred, file, model=None, name="model"):
 
     if model == None:
         print("instantiating model")
-        vl = VanillaLSTM(hidden_dim=h_dim, mediate_dim=6, output_dim=2, traj_num=traj_num)
+        vl = VanillaLSTM(hidden_dim=h_dim, mediate_dim=8, output_dim=2, traj_num=traj_num)
     else:
         vl = model
     vl.to(device)
@@ -364,7 +364,7 @@ def train(T_obs, T_pred, file, model=None, name="model"):
 # %%
 def validate(model, T_obs, T_pred, file):
     #try to validate this
-    h_dim = 6
+    h_dim = 12
 
     batch_size = T_pred
 
@@ -497,7 +497,7 @@ def plotting_batch(batch_trajs_pred_gpu, part_masks, traj_num, batch_idx, coord_
  
     plt.legend(loc="upper right")
     plt.title(f"batch {batch_idx}")
-    plt.savefig("eth_plots/"+str(batch_idx)+str(is_total)+"6_6")
+    plt.savefig("eth_plots/"+str(batch_idx)+str(is_total)+"8_12")
     
     
 def avgDispError(batch_trajs_pred_gpu, part_masks, traj_num, batch_idx, coord_data, T_obs):
