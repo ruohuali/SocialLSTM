@@ -16,7 +16,7 @@ echo "start pushing"
 git add .
 git commit -m "auto"
 git push
-expect "Username for 'https://github.com': "
+expect -exact "Username for 'https://github.com': "
 send "ruohuali"
 expect "Password for 'https://ruohuali@github.com': "
 send "701218Zhang"
