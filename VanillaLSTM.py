@@ -279,7 +279,7 @@ def train(T_obs, T_pred, file, model=None, name="model"):
     tic = time.time()
     print(f"training on {file}")    
     
-    h_dim = 12
+    h_dim = 6
     batch_size = T_pred
 
     #try to train this
@@ -294,7 +294,7 @@ def train(T_obs, T_pred, file, model=None, name="model"):
 
     if model == None:
         print("instantiating model")
-        vl = VanillaLSTM(hidden_dim=h_dim, mediate_dim=8, output_dim=2, traj_num=traj_num)
+        vl = VanillaLSTM(hidden_dim=h_dim, mediate_dim=6, output_dim=2, traj_num=traj_num)
     else:
         vl = model
     vl.to(device)
@@ -308,7 +308,7 @@ def train(T_obs, T_pred, file, model=None, name="model"):
 
     plot_data = [[] for _ in range(len(dataset) // batch_size)]
     #sequentially go over the dataset batch_size by batch_size
-    EPOCH = 30
+    EPOCH = 75
     for epoch in range(EPOCH):
         print(f"epoch {epoch+1}/{EPOCH}  ")
         for batch_idx, data in enumerate(dataloader):
@@ -353,6 +353,12 @@ def train(T_obs, T_pred, file, model=None, name="model"):
     for i,data in enumerate(plot_data):
         plt.plot(np.arange(len(plot_data[0])), data)
     plt.savefig("eth_plots/"+"train"+str(i)+name)
+    plot_data = np.array(plot_data)
+    avg_plot_data = np.mean(plot_data, axis=0)
+    plt.figure()
+    plt.plot(avg_plot_data)
+    plt.savefig("eth_plots/"+"train"+str(i)+name+"avg")
+    
 
     #save the model
     torch.save(vl, name)
@@ -364,7 +370,7 @@ def train(T_obs, T_pred, file, model=None, name="model"):
 # %%
 def validate(model, T_obs, T_pred, file):
     #try to validate this
-    h_dim = 12
+    h_dim = 6
 
     batch_size = T_pred
 
