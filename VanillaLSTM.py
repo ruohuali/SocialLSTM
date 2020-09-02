@@ -308,7 +308,7 @@ def train(T_obs, T_pred, file, model=None, name="model"):
 
     plot_data = [[] for _ in range(len(dataset) // batch_size)]
     #sequentially go over the dataset batch_size by batch_size
-    EPOCH = 75
+    EPOCH = 30
     for epoch in range(EPOCH):
         print(f"epoch {epoch+1}/{EPOCH}  ")
         for batch_idx, data in enumerate(dataloader):
@@ -672,6 +672,6 @@ if __name__ == "__main__":
 
     #temp = train(8, 20, "datasets/eth/test/biwi_eth.txt")
     #validate(temp, 8, 20, "datasets/eth/test/biwi_eth.txt")
-    temp1 = torch.load("model")
+    temp1 = torch.load("model.pt")
     validate(temp1, 8, 20, "datasets/hotel/test/biwi_hotel.txt")
 
