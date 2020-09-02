@@ -279,7 +279,7 @@ def train(T_obs, T_pred, file, model=None, name="model.pt"):
     tic = time.time()
     print(f"training on {file}")    
     
-    h_dim = 6
+    h_dim = 24
     batch_size = T_pred
 
     #try to train this
@@ -294,7 +294,7 @@ def train(T_obs, T_pred, file, model=None, name="model.pt"):
 
     if model == None:
         print("instantiating model")
-        vl = VanillaLSTM(hidden_dim=h_dim, mediate_dim=6, output_dim=2, traj_num=traj_num)
+        vl = VanillaLSTM(hidden_dim=h_dim, mediate_dim=30, output_dim=2, traj_num=traj_num)
     else:
         vl = model
     vl.to(device)
@@ -370,7 +370,7 @@ def train(T_obs, T_pred, file, model=None, name="model.pt"):
 # %%
 def validate(model, T_obs, T_pred, file):
     #try to validate this
-    h_dim = 6
+    h_dim = 24
 
     batch_size = T_pred
 
