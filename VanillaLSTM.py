@@ -670,7 +670,8 @@ if __name__ == "__main__":
 #        validate(vl1, 8, 20, file) 
 
 
-    temp = train(8, 20, "datasets/eth/test/biwi_eth.txt")
-    validate(temp, 8, 20, "datasets/eth/test/biwi_eth.txt")
-
+    #temp = train(8, 20, "datasets/eth/test/biwi_eth.txt")
+    #validate(temp, 8, 20, "datasets/eth/test/biwi_eth.txt")
+    temp1 = torch.load("model.pt")
+    validate(temp1, 8, 20, "datasets/eth/test/biwi_hotel.txt")
 

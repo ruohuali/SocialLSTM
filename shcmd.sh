@@ -2,14 +2,12 @@
 
 #remove old pics
 echo "removing old pics"
-cd eth_plots
-rm **
-cd ..
+rm -rf eth_plots
+mkdir eth_plots
 
 #start training
 echo "initiating training"
-python3 fuck.py
-rm fuck.py
+python3 VanillaLSTM.py
 echo "training is done"
 
 #git push
