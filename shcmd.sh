@@ -17,7 +17,7 @@ git add .
 git commit -m "auto"
 git push
 expect "Username for 'https://github.com': "
-send "ruohuali\r"
+send "ruohuali\n"
 expect "Password for 'https://ruohuali@github.com': "
-send "701218Zhang\r"
+send "701218Zhang\n"
 echo "end pushing"
