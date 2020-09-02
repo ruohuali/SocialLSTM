@@ -1,4 +1,5 @@
 #!/bin/bash
+#!/bin/expect
 
 #remove old pics
 echo "removing old pics"
