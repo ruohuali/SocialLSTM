@@ -352,12 +352,12 @@ def train(T_obs, T_pred, file, model=None, name="model.pt"):
     plt.figure()
     for i,data in enumerate(plot_data):
         plt.plot(np.arange(len(plot_data[0])), data)
-    plt.savefig("eth_plots/"+"train"+str(i)+name)
+    plt.savefig("eth_plots/"+"train"+str(i))
     plot_data = np.array(plot_data)
     avg_plot_data = np.mean(plot_data, axis=0)
     plt.figure()
     plt.plot(avg_plot_data)
-    plt.savefig("eth_plots/"+"train"+str(i)+name+"avg")
+    plt.savefig("eth_plots/"+"train"+str(i)+"avg")
     
 
     #save the model
