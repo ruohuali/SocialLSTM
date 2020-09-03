@@ -223,16 +223,15 @@ class VanillaLSTM(nn.Module):
                 
             elif frame_idx > T_obs and frame_idx <= T_pred:
                 r = self.Phi(self.InputLayer(outputs[frame_idx-1].clone()))
-#                 r = self.Phi(self.InputLayer(outputs[frame_idx-1]))
                 all_h_t, all_c_t = self.LSTMCell(r, (all_h_t, all_c_t))
                 part_mask = torch.t(part_masks[frame_idx]).expand(part_masks[frame_idx].shape[1], self.output_dim)
                 outputs[frame_idx] = self.OutputLayer(all_h_t) * part_mask                
                 
             #dirty fix for appearance that's too short
-            if frame_idx > 3 and frame_idx > T_obs:
-                for traj_idx in torch.where(part_masks[frame_idx][0] != 0)[0]:
-                    if part_masks[frame_idx-3][0][traj_idx] == 0:
-                        outputs[frame_idx, traj_idx] = Y[frame_idx, traj_idx] 
+            # if frame_idx > 3 and frame_idx > T_obs:
+            #     for traj_idx in torch.where(part_masks[frame_idx][0] != 0)[0]:
+            #         if part_masks[frame_idx-3][0][traj_idx] == 0:
+            #             outputs[frame_idx, traj_idx] = Y[frame_idx, traj_idx] 
 
         return outputs
 
@@ -279,7 +278,7 @@ def train(T_obs, T_pred, file, model=None, name="model.pt"):
     tic = time.time()
     print(f"training on {file}")    
     
-    h_dim = 128
+    h_dim = 6
     batch_size = T_pred
 
     #try to train this
@@ -294,7 +293,7 @@ def train(T_obs, T_pred, file, model=None, name="model.pt"):
 
     if model == None:
         print("instantiating model")
-        vl = VanillaLSTM(hidden_dim=h_dim, mediate_dim=100, output_dim=2, traj_num=traj_num)
+        vl = VanillaLSTM(hidden_dim=h_dim, mediate_dim=6, output_dim=2, traj_num=traj_num)
     else:
         vl = model
     vl.to(device)
@@ -303,12 +302,12 @@ def train(T_obs, T_pred, file, model=None, name="model.pt"):
     criterion = nn.MSELoss(reduction="sum")
     # criterion = Gaussian2DNll
 #     optimizer = torch.optim.Adagrad(vl.parameters(), weight_decay=0.0005)
-    optimizer = torch.optim.Adam(vl.parameters(), weight_decay=0.01)
+    optimizer = torch.optim.Adam(vl.parameters(), weight_decay=0.001)
 #     optimizer = torch.optim.SGD(vl.parameters(), lr=1e-4, weight_decay=0.0005)
 
     plot_data = [[] for _ in range(len(dataset) // batch_size)]
     #sequentially go over the dataset batch_size by batch_size
-    EPOCH = 10
+    EPOCH = 20
     for epoch in range(EPOCH):
         print(f"epoch {epoch+1}/{EPOCH}  ")
         for batch_idx, data in enumerate(dataloader):
@@ -370,7 +369,7 @@ def train(T_obs, T_pred, file, model=None, name="model.pt"):
 # %%
 def validate(model, T_obs, T_pred, file):
     #try to validate this
-    h_dim = 128
+    h_dim = 6
 
     batch_size = T_pred
 
@@ -503,7 +502,7 @@ def plotting_batch(batch_trajs_pred_gpu, part_masks, traj_num, batch_idx, coord_
  
     plt.legend(loc="upper right")
     plt.title(f"batch {batch_idx}")
-    plt.savefig("eth_plots/"+str(batch_idx)+str(is_total)+"6_6fs")
+    plt.savefig("eth_plots/"+str(batch_idx)+str(is_total)+"6-6-20-all")
     
     
 def avgDispError(batch_trajs_pred_gpu, part_masks, traj_num, batch_idx, coord_data, T_obs):
@@ -533,7 +532,6 @@ def avgDispError(batch_trajs_pred_gpu, part_masks, traj_num, batch_idx, coord_da
             temp_point = next_point
         trajs_pred_coords.append(traj_pred_coord)   
         
-    
     #compare
     trajs_dist = []
     step_num = 0
@@ -580,7 +578,6 @@ def finalDispError(batch_trajs_pred_gpu, part_masks, traj_num, batch_idx, coord_
             traj_pred_coord = np.vstack((traj_pred_coord, next_point))
             temp_point = next_point
         trajs_pred_coords.append(traj_pred_coord)   
-        
     
     #compare
     trajs_dist = []
@@ -648,30 +645,29 @@ if __name__ == "__main__":
             
 #         print("====================================")
 
-#    files_dir = "datasets/eth/train"
-#    name = "eth_vl.pt"
-#    print(f"pulling from dir {files_dir}")
-#    files = [join(files_dir, f) for f in listdir(files_dir) if isfile(join(files_dir, f))]
-#    vl = None
-#    #training
-#    for file in files:
-#        vl = train(8, 20, file, model=vl, name=name)
+   files_dir = "datasets/eth/train"
+   name = "eth_vl.pt"
+   print(f"pulling from dir {files_dir}")
+   files = [join(files_dir, f) for f in listdir(files_dir) if isfile(join(files_dir, f))]
+   vl = None
+   #training
+   for file in files:
+       vl = train(8, 20, file, model=vl, name=name)
 
-#    torch.cuda.empty_cache()
-#    vl1 = torch.load("eth_vl.pt")
-#    print(f"loading from eth_vl.pt")
-# #    validate(vl1, 8, 20, "try_dataset.txt")       
-#    #preparing validating set
-#    files_dir = "datasets/eth/test"
-#    print(f"pulling from dir {files_dir}")        
-#    files = [join(files_dir, f) for f in listdir(files_dir) if isfile(join(files_dir, f))]
-#    #validating
-#    for file in files:
-#        validate(vl1, 8, 20, file) 
+   torch.cuda.empty_cache()
+   vl1 = torch.load("eth_vl.pt")
+   print(f"loading from eth_vl.pt")
+   #preparing validating set
+   files_dir = "datasets/eth/test"
+   print(f"pulling from dir {files_dir}")        
+   files = [join(files_dir, f) for f in listdir(files_dir) if isfile(join(files_dir, f))]
+   #validating
+   for file in files:
+       validate(vl1, 8, 20, file) 
 
 
-    temp = train(8, 20, "datasets/hotel/test/biwi_hotel.txt")
-    #validate(temp, 8, 20, "datasets/eth/test/biwi_eth.txt")
-    #temp1 = torch.load("model.pt")
-    validate(temp, 8, 20, "datasets/hotel/test/biwi_hotel.txt")
-    validate(temp, 8, 20, "datasets/eth/test/biwi_eth.txt")
+    # temp = train(8, 20, "datasets/hotel/test/biwi_hotel.txt")
+    # #validate(temp, 8, 20, "datasets/eth/test/biwi_eth.txt")
+    # #temp1 = torch.load("model.pt")
+    # validate(temp, 8, 20, "datasets/hotel/test/biwi_hotel.txt")
+    # validate(temp, 8, 20, "datasets/eth/test/biwi_eth.txt")
