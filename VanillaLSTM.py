@@ -651,8 +651,12 @@ if __name__ == "__main__":
    files = [join(files_dir, f) for f in listdir(files_dir) if isfile(join(files_dir, f))]
    vl = None
    #training
+   before_file = files[len(files)-1]
    for file in files:
        vl = train(8, 20, file, model=vl, name=name)
+       validate(vl, 8, 20, file)
+       validate(vl, 8, 20, before_file)
+       before_file = file
 
    torch.cuda.empty_cache()
    vl1 = torch.load("eth_vl.pt")
