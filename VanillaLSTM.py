@@ -286,13 +286,10 @@ def ADE(X, Y):
         dist = 0.
         if (x_traj == torch.zeros(*x_traj.shape, device=device)).all():
             traj_dists.append(dist)
-            print("000")
             continue      
         x_p, y_p = torch.zeros(2, device=device), torch.zeros(2, device=device)
         for x_off, y_off in zip(x_traj, y_traj):
-            print(f"oo {x_off} {y_off}")
             x_p += x_off; y_p += y_off
-            print(f"pp {x_p} {y_p}")
             dist += torch.dist(x_p, y_p)
         traj_dists.append(dist)
     traj_dists = torch.tensor(traj_dists, device=device, requires_grad=True)
@@ -333,7 +330,7 @@ def train(T_obs, T_pred, file, model=None, name="model.pt"):
 
     plot_data = [[] for _ in range(len(dataset) // batch_size)]
     #sequentially go over the dataset batch_size by batch_size
-    EPOCH = 10
+    EPOCH = 70
     for epoch in range(EPOCH):
         print(f"epoch {epoch+1}/{EPOCH}  ")
         for batch_idx, data in enumerate(dataloader):
