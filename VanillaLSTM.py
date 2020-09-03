@@ -228,10 +228,10 @@ class VanillaLSTM(nn.Module):
                 outputs[frame_idx] = self.OutputLayer(all_h_t) * part_mask                
                 
             #dirty fix for appearance that's too short
-            # if frame_idx > 3 and frame_idx > T_obs:
-            #     for traj_idx in torch.where(part_masks[frame_idx][0] != 0)[0]:
-            #         if part_masks[frame_idx-3][0][traj_idx] == 0:
-            #             outputs[frame_idx, traj_idx] = Y[frame_idx, traj_idx] 
+            if frame_idx > 3 and frame_idx > T_obs:
+                for traj_idx in torch.where(part_masks[frame_idx][0] != 0)[0]:
+                    if part_masks[frame_idx-3][0][traj_idx] == 0:
+                        outputs[frame_idx, traj_idx] = Y[frame_idx, traj_idx] 
 
         return outputs
 
@@ -299,15 +299,15 @@ def train(T_obs, T_pred, file, model=None, name="model.pt"):
     vl.to(device)
 
     #define loss & optimizer
-    criterion = nn.MSELoss(reduction="sum")
+    criterion = nn.MSELoss(reduction="mean")
     # criterion = Gaussian2DNll
 #     optimizer = torch.optim.Adagrad(vl.parameters(), weight_decay=0.0005)
-    optimizer = torch.optim.Adam(vl.parameters(), weight_decay=0.001)
+    optimizer = torch.optim.Adam(vl.parameters(), weight_decay=0.01)
 #     optimizer = torch.optim.SGD(vl.parameters(), lr=1e-4, weight_decay=0.0005)
 
     plot_data = [[] for _ in range(len(dataset) // batch_size)]
     #sequentially go over the dataset batch_size by batch_size
-    EPOCH = 20
+    EPOCH = 70
     for epoch in range(EPOCH):
         print(f"epoch {epoch+1}/{EPOCH}  ")
         for batch_idx, data in enumerate(dataloader):
