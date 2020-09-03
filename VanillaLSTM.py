@@ -284,6 +284,10 @@ def ADE(X, Y):
     #calc the distances for each traj
     for x_traj, y_traj in zip(X_traj, Y_traj):
         dist = 0.
+        if (x_traj == torch.zeros(*x_traj.shape, device=device)).all():
+            traj_dists.append(dist)
+            print("000")
+            continue      
         x_p, y_p = torch.zeros(2, device=device), torch.zeros(2, device=device)
         for x_off, y_off in zip(x_traj, y_traj):
             print(f"oo {x_off} {y_off}")
@@ -300,7 +304,7 @@ def train(T_obs, T_pred, file, model=None, name="model.pt"):
     tic = time.time()
     print(f"training on {file}")    
     
-    h_dim = 6
+    h_dim = 16
     batch_size = T_pred
 
     #try to train this
@@ -315,7 +319,7 @@ def train(T_obs, T_pred, file, model=None, name="model.pt"):
 
     if model == None:
         print("instantiating model")
-        vl = VanillaLSTM(hidden_dim=h_dim, mediate_dim=6, output_dim=2, traj_num=traj_num)
+        vl = VanillaLSTM(hidden_dim=h_dim, mediate_dim=12, output_dim=2, traj_num=traj_num)
     else:
         vl = model
     vl.to(device)
@@ -391,7 +395,7 @@ def train(T_obs, T_pred, file, model=None, name="model.pt"):
 # %%
 def validate(model, T_obs, T_pred, file):
     #try to validate this
-    h_dim = 6
+    h_dim = 16
 
     batch_size = T_pred
 
