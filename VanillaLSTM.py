@@ -284,9 +284,10 @@ def ADE(X, Y):
     #calc the distances for each traj
     for x_traj, y_traj in zip(X_traj, Y_traj):
         dist = 0.
-        x_p, y_p = 0., 0.
+        x_p, y_p = torch.zeros(2, device=device), torch.zeros(2, device=device)
         for x_off, y_off in zip(x_traj, y_traj):
             x_p += x_off; y_p += y_off
+            if x_off [0] != 0.:
             dist += torch.dist(x_p, y_p)
         traj_dists.append(dist)
     traj_dists = torch.tensor(traj_dists, device=device, requires_grad=True)
