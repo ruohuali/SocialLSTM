@@ -273,6 +273,24 @@ def trajPruningByStride(part_mask, ref_tensor, in_tensors, length=0.3):
     return in_tensors
 
 
+'''pointless effort to make something right'''
+def ADE(X, Y):
+    #first specify the traj num
+    traj_num = X.shape[1]
+    #reform the tensor to be on traj-based
+    X_traj = [X[:,traj_idx,:] for traj_idx in range(traj_num)]
+    Y_traj = [Y[:,traj_idx,:] for traj_idx in range(traj_num)]    
+    traj_dists = []
+    #calc the distances for each traj
+    for x_traj, y_traj in zip(X_traj, Y_traj):
+        dist = 0.
+        for x_p, y_p in zip(x_traj, y_traj):
+            dist += torch.dist(x_p, y_p)
+        traj_dists.append(dist)
+    traj_dists = torch.tensor(traj_dists, device=device, requires_grad=True)
+    return torch.sum(traj_dists)
+
+
 # %%
 def train(T_obs, T_pred, file, model=None, name="model.pt"):
     tic = time.time()
@@ -299,15 +317,15 @@ def train(T_obs, T_pred, file, model=None, name="model.pt"):
     vl.to(device)
 
     #define loss & optimizer
-    criterion = nn.MSELoss(reduction="mean")
-    # criterion = Gaussian2DNll
+    # criterion = nn.MSELoss(reduction="mean")
+    criterion = ADE
 #     optimizer = torch.optim.Adagrad(vl.parameters(), weight_decay=0.0005)
-    optimizer = torch.optim.Adam(vl.parameters(), weight_decay=0.01)
+    optimizer = torch.optim.Adam(vl.parameters(), weight_decay=0.0005)
 #     optimizer = torch.optim.SGD(vl.parameters(), lr=1e-4, weight_decay=0.0005)
 
     plot_data = [[] for _ in range(len(dataset) // batch_size)]
     #sequentially go over the dataset batch_size by batch_size
-    EPOCH = 70
+    EPOCH = 10
     for epoch in range(EPOCH):
         print(f"epoch {epoch+1}/{EPOCH}  ")
         for batch_idx, data in enumerate(dataloader):
@@ -645,33 +663,33 @@ if __name__ == "__main__":
             
 #         print("====================================")
 
-    files_dir = "datasets/eth/train"
-    name = "eth_vl.pt"
-    print(f"pulling from dir {files_dir}")
-    files = [join(files_dir, f) for f in listdir(files_dir) if isfile(join(files_dir, f))]
-    vl = None
-    #training
-    before_file = files[len(files)-1]
-    for file in files:
-        vl = train(8, 20, file, model=vl, name=name)
-        validate(vl, 8, 20, file)
-        validate(vl, 8, 20, before_file)
-        before_file = file
+    # files_dir = "datasets/eth/train"
+    # name = "eth_vl.pt"
+    # print(f"pulling from dir {files_dir}")
+    # files = [join(files_dir, f) for f in listdir(files_dir) if isfile(join(files_dir, f))]
+    # vl = None
+    # #training
+    # before_file = files[len(files)-1]
+    # for file in files:
+    #     vl = train(8, 20, file, model=vl, name=name)
+    #     validate(vl, 8, 20, file)
+    #     validate(vl, 8, 20, before_file)
+    #     before_file = file
 
-    torch.cuda.empty_cache()
-    vl1 = torch.load("eth_vl.pt")
-    print(f"loading from eth_vl.pt")
-    #preparing validating set
-    files_dir = "datasets/eth/test"
-    print(f"pulling from dir {files_dir}")        
-    files = [join(files_dir, f) for f in listdir(files_dir) if isfile(join(files_dir, f))]
-    #validating
-    for file in files:
-        validate(vl1, 8, 20, file) 
+    # torch.cuda.empty_cache()
+    # vl1 = torch.load("eth_vl.pt")
+    # print(f"loading from eth_vl.pt")
+    # #preparing validating set
+    # files_dir = "datasets/eth/test"
+    # print(f"pulling from dir {files_dir}")        
+    # files = [join(files_dir, f) for f in listdir(files_dir) if isfile(join(files_dir, f))]
+    # #validating
+    # for file in files:
+    #     validate(vl1, 8, 20, file) 
 
 
-    # temp = train(8, 20, "datasets/hotel/test/biwi_hotel.txt")
-    # #validate(temp, 8, 20, "datasets/eth/test/biwi_eth.txt")
+    temp = train(8, 20, "datasets/hotel/test/biwi_hotel.txt")
+    # validate(temp, 8, 20, "datasets/eth/test/biwi_eth.txt")
     # #temp1 = torch.load("model.pt")
-    # validate(temp, 8, 20, "datasets/hotel/test/biwi_hotel.txt")
+    validate(temp, 8, 20, "datasets/hotel/test/biwi_hotel.txt")
     # validate(temp, 8, 20, "datasets/eth/test/biwi_eth.txt")
