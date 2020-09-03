@@ -645,29 +645,29 @@ if __name__ == "__main__":
             
 #         print("====================================")
 
-   files_dir = "datasets/eth/train"
-   name = "eth_vl.pt"
-   print(f"pulling from dir {files_dir}")
-   files = [join(files_dir, f) for f in listdir(files_dir) if isfile(join(files_dir, f))]
-   vl = None
-   #training
-   before_file = files[len(files)-1]
-   for file in files:
-       vl = train(8, 20, file, model=vl, name=name)
-       validate(vl, 8, 20, file)
-       validate(vl, 8, 20, before_file)
-       before_file = file
+    files_dir = "datasets/eth/train"
+    name = "eth_vl.pt"
+    print(f"pulling from dir {files_dir}")
+    files = [join(files_dir, f) for f in listdir(files_dir) if isfile(join(files_dir, f))]
+    vl = None
+    #training
+    before_file = files[len(files)-1]
+    for file in files:
+        vl = train(8, 20, file, model=vl, name=name)
+        validate(vl, 8, 20, file)
+        validate(vl, 8, 20, before_file)
+        before_file = file
 
-   torch.cuda.empty_cache()
-   vl1 = torch.load("eth_vl.pt")
-   print(f"loading from eth_vl.pt")
-   #preparing validating set
-   files_dir = "datasets/eth/test"
-   print(f"pulling from dir {files_dir}")        
-   files = [join(files_dir, f) for f in listdir(files_dir) if isfile(join(files_dir, f))]
-   #validating
-   for file in files:
-       validate(vl1, 8, 20, file) 
+    torch.cuda.empty_cache()
+    vl1 = torch.load("eth_vl.pt")
+    print(f"loading from eth_vl.pt")
+    #preparing validating set
+    files_dir = "datasets/eth/test"
+    print(f"pulling from dir {files_dir}")        
+    files = [join(files_dir, f) for f in listdir(files_dir) if isfile(join(files_dir, f))]
+    #validating
+    for file in files:
+        validate(vl1, 8, 20, file) 
 
 
     # temp = train(8, 20, "datasets/hotel/test/biwi_hotel.txt")
