@@ -303,7 +303,7 @@ def train(T_obs, T_pred, file, model=None, name="model.pt"):
     criterion = nn.MSELoss(reduction="sum")
     # criterion = Gaussian2DNll
 #     optimizer = torch.optim.Adagrad(vl.parameters(), weight_decay=0.0005)
-    optimizer = torch.optim.Adam(vl.parameters(), weight_decay=0.00)
+    optimizer = torch.optim.Adam(vl.parameters(), weight_decay=0.01)
 #     optimizer = torch.optim.SGD(vl.parameters(), lr=1e-4, weight_decay=0.0005)
 
     plot_data = [[] for _ in range(len(dataset) // batch_size)]
