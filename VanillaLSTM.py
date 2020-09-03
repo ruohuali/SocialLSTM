@@ -286,7 +286,9 @@ def ADE(X, Y):
         dist = 0.
         x_p, y_p = torch.zeros(2, device=device), torch.zeros(2, device=device)
         for x_off, y_off in zip(x_traj, y_traj):
+            print(f"oo {x_off} {y_off}")
             x_p += x_off; y_p += y_off
+            print(f"pp {x_p} {y_p}")
             dist += torch.dist(x_p, y_p)
         traj_dists.append(dist)
     traj_dists = torch.tensor(traj_dists, device=device, requires_grad=True)
