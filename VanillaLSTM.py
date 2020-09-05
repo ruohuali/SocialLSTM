@@ -257,7 +257,7 @@ def trajPruningByAppear(part_mask, ratio=0.6, in_tensor=None):
         return new_mask
     
 '''@note last elem in in_tensors must be the mask'''
-def trajPruningByStride(part_mask, ref_tensor, in_tensors, length=0.3):
+def trajPruningByStride(part_mask, ref_tensor, in_tensors, length=0.8):
     for traj in range(ref_tensor.shape[1]):
         actual_strides = ref_tensor[:,traj,2:]
         avg_stride_len = torch.mean(torch.abs(actual_strides[actual_strides!=torch.zeros(2, device=device)]))
@@ -275,25 +275,31 @@ def trajPruningByStride(part_mask, ref_tensor, in_tensors, length=0.3):
 
 '''pointless effort to make something right'''
 def ADE(X, Y):
-    #first specify the traj num
-    traj_num = X.shape[1]
-    #reform the tensor to be on traj-based
-    X_traj = [X[:,traj_idx,:] for traj_idx in range(traj_num)]
-    Y_traj = [Y[:,traj_idx,:] for traj_idx in range(traj_num)]    
-    traj_dists = []
-    #calc the distances for each traj
-    for x_traj, y_traj in zip(X_traj, Y_traj):
-        dist = 0.
-        if (x_traj == torch.zeros(*x_traj.shape, device=device)).all():
-            traj_dists.append(dist)
-            continue      
-        x_p, y_p = torch.zeros(2, device=device), torch.zeros(2, device=device)
-        for x_off, y_off in zip(x_traj, y_traj):
-            x_p += x_off; y_p += y_off
-            dist += torch.dist(x_p, y_p)
-        traj_dists.append(dist)
-    traj_dists = torch.tensor(traj_dists, device=device, requires_grad=True)
-    return torch.sum(traj_dists)
+    # #first specify the traj num
+    # traj_num = X.shape[1]
+    # #reform the tensor to be on traj-based
+    # X_traj = [X[:,traj_idx,:] for traj_idx in range(traj_num)]
+    # Y_traj = [Y[:,traj_idx,:] for traj_idx in range(traj_num)]    
+    # traj_dists = []
+    # #calc the distances for each traj
+    # for x_traj, y_traj in zip(X_traj, Y_traj):
+    #     dist = 0.
+    #     if (x_traj == torch.zeros(*x_traj.shape, device=device)).all():
+    #         traj_dists.append(dist)
+    #         continue      
+    #     x_p, y_p = torch.zeros(2, device=device), torch.zeros(2, device=device)
+    #     for x_off, y_off in zip(x_traj, y_traj):
+    #         x_p += x_off; y_p += y_off
+    #         dist += torch.dist(x_p, y_p)
+    #     traj_dists.append(dist)
+    # traj_dists = torch.tensor(traj_dists, device=device)
+    # Loss = torch.sum(traj_dists)
+    X_all = X.reshape(X.shape[0]*X.shape[1],X.shape[2])
+    Y_all = Y.reshape(Y.shape[0]*Y.shape[1],Y.shape[2])
+    Loss = 0
+    for x, y in zip(X_all, Y_all):
+        Loss += torch.dist(x, y)
+    return Loss
 
 
 # %%
@@ -330,7 +336,7 @@ def train(T_obs, T_pred, file, model=None, name="model.pt"):
 
     plot_data = [[] for _ in range(len(dataset) // batch_size)]
     #sequentially go over the dataset batch_size by batch_size
-    EPOCH = 70
+    EPOCH = 10
     for epoch in range(EPOCH):
         print(f"epoch {epoch+1}/{EPOCH}  ")
         for batch_idx, data in enumerate(dataloader):
