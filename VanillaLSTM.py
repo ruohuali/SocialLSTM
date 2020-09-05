@@ -394,19 +394,19 @@ def train(T_obs, T_pred, files, model=None, name="model.pt"):
     toc = time.time()
     print(f"training consumed {toc-tic}")
 
-    def ppp(v,i):
+    #plot cost
+    def ppp(v,j):
         plt.figure()
         for i, data in enumerate(v):
             if len(data) != 0:
                 plt.plot(np.arange(len(v[0])), data)        
-        plt.savefig("eth_plots/"+"train"+str(i))
-        print("--->","eth_plots/"+"train"+str(i))
-    #plot the cost
-    i = 0
+        plt.savefig("eth_plots/"+"train"+str(j))
+        print("--->","eth_plots/"+"train"+str(j))
+    j = 0
     for k, v in plot_data.items():
-        print(f"k {k} \n v {v[0]} {len(v)}")
+        #print(f"k {k} \n v {v[0]} {len(v)}")
         ppp(v,i)
-        i+=1
+        j+=1
     
     # plot_data = np.array(plot_data)
     # avg_plot_data = np.mean(plot_data, axis=0)
