@@ -405,7 +405,7 @@ def train(T_obs, T_pred, files, model=None, name="model.pt"):
     j = 0
     for k, v in plot_data.items():
         #print(f"k {k} \n v {v[0]} {len(v)}")
-        ppp(v,i)
+        ppp(v,j)
         j+=1
     
     # plot_data = np.array(plot_data)
