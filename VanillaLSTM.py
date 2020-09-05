@@ -394,6 +394,13 @@ def train(T_obs, T_pred, files, model=None, name="model.pt"):
     toc = time.time()
     print(f"training consumed {toc-tic}")
 
+    def ppp(v,i):
+        plt.figure()
+        for i, data in enumerate(v):
+            if len(data) != 0:
+                plt.plot(np.arange(len(v[0])), data)        
+        plt.savefig("eth_plots/"+"train"+str(i))
+        print("--->","eth_plots/"+"train"+str(i))
     #plot the cost
     i = 0
     for k, v in plot_data.items():
@@ -413,14 +420,6 @@ def train(T_obs, T_pred, files, model=None, name="model.pt"):
     print(f"saved model in {name}\n")    
 
     return vl
-
-    def ppp(v,i):
-        plt.figure()
-        for i, data in enumerate(v):
-            if len(data) != 0:
-                plt.plot(np.arange(len(v[0])), data)        
-        plt.savefig("eth_plots/"+"train"+str(i))
-        print("--->","eth_plots/"+"train"+str(i))
 
 
 # %%
