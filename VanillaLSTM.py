@@ -343,7 +343,7 @@ def train(T_obs, T_pred, files, model=None, name="model.pt"):
     for file in files:
         plot_data[file] = [[] for _ in range(50)]
 
-    EPOCH = 2
+    EPOCH = 10
     for epoch in range(EPOCH):
         print(f"epoch {epoch+1}/{EPOCH}  ")
         for file in files:
@@ -707,18 +707,18 @@ if __name__ == "__main__":
     files = [join(files_dir, f) for f in listdir(files_dir) if isfile(join(files_dir, f))]
     vl = None
     #training
-    vl = train(8, 20, files)
+    vl = train(8, 20, files, name=name)
 
-    # torch.cuda.empty_cache()
-    # vl1 = torch.load("eth_vl.pt")
-    # print(f"loading from eth_vl.pt")
-    # #preparing validating set
-    # files_dir = "datasets/eth/test"
-    # print(f"pulling from dir {files_dir}")        
-    # files = [join(files_dir, f) for f in listdir(files_dir) if isfile(join(files_dir, f))]
-    # #validating
-    # for file in files:
-    #     validate(vl1, 8, 20, file) 
+    torch.cuda.empty_cache()
+    vl1 = torch.load("eth_vl.pt")
+    print(f"loading from eth_vl.pt")
+    #preparing validating set
+    files_dir = "datasets/eth/test"
+    print(f"pulling from dir {files_dir}")        
+    files = [join(files_dir, f) for f in listdir(files_dir) if isfile(join(files_dir, f))]
+    #validating
+    for file in files:
+        validate(vl1, 8, 20, file) 
 
 
     #temp = train(8, 20, "datasets/hotel/test/biwi_hotel.txt")
