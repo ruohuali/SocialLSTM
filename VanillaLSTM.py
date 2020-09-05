@@ -398,11 +398,7 @@ def train(T_obs, T_pred, files, model=None, name="model.pt"):
     i = 0
     for k, v in plot_data.items():
         print(f"k {k} \n v {v[0]} {len(v)}")
-        plt.figure()
-        for i, data in enumerate(v):
-            if len(data) != 0:
-                plt.plot(np.arange(len(v[0])), data)        
-        plt.savefig("eth_plots/"+"train"+str(i))
+        ppp(v,i)
         i+=1
     
     # plot_data = np.array(plot_data)
@@ -417,6 +413,15 @@ def train(T_obs, T_pred, files, model=None, name="model.pt"):
     print(f"saved model in {name}\n")    
 
     return vl
+
+    def ppp(v,i):
+        plt.figure()
+        for i, data in enumerate(v):
+            if len(data) != 0:
+                plt.plot(np.arange(len(v[0])), data)        
+        plt.savefig("eth_plots/"+"train"+str(i))
+        print("--->","eth_plots/"+"train"+str(i))
+
 
 # %%
 def validate(model, T_obs, T_pred, file):
