@@ -1,7 +1,12 @@
-import torch
+import numpy as np
+from matplotlib import pyplot as plt
 
-X = torch.tensor([[[1.,2.],[3.,4.],[5.,6.]],[[1.,2.],[3.,4.],[5.,6.]],[[1.,2.],[3.,4.],[5.,6.]],[[1.,2.],[3.,4.],[5.,6.]]])
-print(X, X.shape)
-X = X.reshape(X.shape[0]*X.shape[1],X.shape[2])
-print(X, X.shape)
-Y = X.clone()*3
+x = np.array([1,2,3,4,5])
+y = 3*x
+z = 4*x
+X = [x,y,z]
+
+for i in range(3):
+	plt.figure()
+	plt.plot(X[i])
+	plt.savefig("thefuck"+str(i))
