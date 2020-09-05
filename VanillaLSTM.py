@@ -257,13 +257,17 @@ def trajPruningByAppear(part_mask, ratio=0.6, in_tensor=None):
         return new_mask
     
 '''@note last elem in in_tensors must be the mask'''
-def trajPruningByStride(part_mask, ref_tensor, in_tensors, length=0.8):
+def trajPruningByStride(part_mask, ref_tensor, in_tensors, length=0.3):
     for traj in range(ref_tensor.shape[1]):
         actual_strides = ref_tensor[:,traj,2:]
         avg_stride_len = torch.mean(torch.abs(actual_strides[actual_strides!=torch.zeros(2, device=device)]))
         #if divide by zero means the traj never appears in the batch
         if math.isnan(avg_stride_len):
-            continue
+            for i, in_tensor in enumerate(in_tensors):
+                if i == len(in_tensors)-1:
+                    in_tensors[i][:,0,traj] *= 0.
+                else:
+                    in_tensors[i][:,traj,:] *= 0.   
         if avg_stride_len < length:
             for i, in_tensor in enumerate(in_tensors):
                 if i == len(in_tensors)-1:
@@ -271,6 +275,20 @@ def trajPruningByStride(part_mask, ref_tensor, in_tensors, length=0.8):
                 else:
                     in_tensors[i][:,traj,:] *= 0.                    
     return in_tensors
+
+def measure(part_mask, ref_tensor, in_tensors, length=0.3):
+    print(f"bbbb {batch_idx} bbbb")
+    for traj in range(ref_tensor.shape[1]):
+        actual_strides = ref_tensor[:,traj,2:]
+        avg_stride_len = torch.mean(torch.abs(actual_strides[actual_strides!=torch.zeros(2, device=device)]))
+        #if divide by zero means the traj never appears in the batch
+        if math.isnan(avg_stride_len):
+            continue
+        if avg_stride_len < length:
+            print(f"{traj} got pruned since it is short {avg_stride_len}")
+        else:
+            print(f"{traj} is not pruned since it is long {avg_stride_len}")
+
 
 
 '''pointless effort to make something right'''
@@ -350,8 +368,9 @@ def train(T_obs, T_pred, file, model=None, name="model.pt"):
                     run_ratio = (T_obs+3)/T_pred
                     input_seq = trajPruningByAppear(part_masks, ratio=run_ratio, in_tensor=input_seq) 
                     Y = trajPruningByAppear(part_masks, ratio=run_ratio, in_tensor=Y)     
-                    pr_masks = trajPruningByAppear(part_masks, ratio=run_ratio)
-                    (input_seq, Y, pr_masks) = trajPruningByStride(pr_masks, input_seq, (input_seq, Y, pr_masks))               
+                    pr_masks = trajPruningByAppear(part_masks, ratio=run_ratio)         
+                    (input_seq, Y, pr_masks) = trajPruningByStride(pr_masks, input_seq, (input_seq, Y, pr_masks))   
+                    # measure(pr_masks, input_seq, (input_seq, Y, pr_masks), batch_idx)               
                     
                     #forward prop
                     output = vl(input_seq, pr_masks, h, c, Y, T_obs, T_pred)
