@@ -335,10 +335,11 @@ def train(T_obs, T_pred, files, model=None, name="model.pt"):
     vl.to(device)
 
     #define loss & optimizer
-    criterion = nn.MSELoss(reduction="sum")
+    #criterion = nn.MSELoss(reduction="sum")
+    criterion = ADE
 #     optimizer = torch.optim.Adagrad(vl.parameters(), weight_decay=0.0005)
-    #optimizer = torch.optim.Adam(vl.parameters(), weight_decay=0.0005)
-    optimizer = ADE
+    optimizer = torch.optim.Adam(vl.parameters(), weight_decay=0.0005)
+    
 
     plot_data = {}
     for file in files:
