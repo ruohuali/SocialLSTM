@@ -304,22 +304,18 @@ def FDE(X, Y, in_list):
     Y_all = Y.reshape(Y.shape[0]*Y.shape[1],Y.shape[2])    
     Loss = torch.tensor(0. , device=device)
     for traj_idx in range(X.shape[1]):
-        fde = torch.tensor(0., device=device)
+        fde = 0.
         traj_mask = torch.tensor([[1.,1.] if i % 20 == traj_idx else [0.,0.] for i in range(X.shape[0]*X.shape[1])], device=device)
         x_traj = X_all*traj_mask
         y_traj = Y_all*traj_mask
-        x_final = torch.sum(x_traj, axis=1)
-        y_final = torch.sum(y_traj, axis=1)
+        x_final = torch.tensor([0.,0.], device=device)
+        y_final = torch.tensor([0.,0.], device=device)
+        for x, y in zip(x_traj, y_traj):
+            x_final += x
+            y_final += y
         fde = torch.dist(x_final, y_final)
         Loss += fde
     return Loss
-    # X_all = X.reshape(X.shape[0]*X.shape[1],X.shape[2])
-    # Y_all = Y.reshape(Y.shape[0]*Y.shape[1],Y.shape[2])
-    # Loss = torch.tensor(0., device=device)
-    # for traj_idx in range(X.shape[1]):
-    #     dist = torch.dist(X_all, Y_all)
-    #     Loss += dist
-    # return Loss    
                 
 
 
@@ -341,7 +337,6 @@ def train(T_obs, T_pred, files, model=None, name="model.pt"):
     #define loss & optimizer
     criterion1 = nn.MSELoss(reduction="sum")
     criterion = FDE
-    criterion2 = SDE
 #     optimizer = torch.optim.Adagrad(vl.parameters(), weight_decay=0.0005)
     optimizer = torch.optim.Adam(vl.parameters(), weight_decay=0.0005)
     
@@ -350,7 +345,7 @@ def train(T_obs, T_pred, files, model=None, name="model.pt"):
     for file in files:
         plot_data[file] = [[] for _ in range(60)]
 
-    EPOCH = 100
+    EPOCH = 5
     for epoch in range(EPOCH):
         print(f"epoch {epoch+1}/{EPOCH}  ")
         for file in files:
@@ -386,8 +381,7 @@ def train(T_obs, T_pred, files, model=None, name="model.pt"):
                         Y_pred = output[T_obs+1:T_pred]
                         Y_g = Y[T_obs+1:T_pred]
 
-                        cost = criterion(Y_pred, Y_g, part_list)
-                        # cost = criterion2(Y_pred, Y_g)
+                        cost = 2*criterion(Y_pred, Y_g, part_list)
 
                         if epoch % 10 == 9:
                             print(epoch, batch_idx, cost.item())
