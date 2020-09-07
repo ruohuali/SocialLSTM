@@ -311,7 +311,6 @@ def FDE(X, Y, in_list):
         x_final = torch.sum(x_traj, axis=1)
         y_final = torch.sum(y_traj, axis=1)
         fde = torch.dist(x_final, y_final)
-        fde = X_all
         Loss += fde
     return Loss
     # X_all = X.reshape(X.shape[0]*X.shape[1],X.shape[2])
