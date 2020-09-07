@@ -351,15 +351,16 @@ def train(T_obs, T_pred, files, model=None, name="model.pt"):
 
     #define loss & optimizer
     criterion = nn.MSELoss(reduction="sum")
-#     optimizer = torch.optim.Adagrad(vl.parameters(), weight_decay=0.0005)
-    optimizer = torch.optim.Adam(vl.parameters(), weight_decay=0.0005)
+    # optimizer = torch.optim.Adagrad(vl.parameters(), weight_decay=0.0005)
+    # optimizer = torch.optim.Adam(vl.parameters(), weight_decay=0.0005)
+    optimizer = torch.optim.SGD(vl.parameters(), weight_decay=0.0005)
     
 
     plot_data = {}
     for file in files:
         plot_data[file] = [[] for _ in range(60)]
 
-    EPOCH = 25
+    EPOCH = 100
     for epoch in range(EPOCH):
         print(f"epoch {epoch+1}/{EPOCH}  ")
         for file in files:
