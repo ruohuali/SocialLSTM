@@ -334,7 +334,7 @@ def train(T_obs, T_pred, files, model=None, name="model.pt"):
 
     #define loss & optimizer
     criterion1 = nn.MSELoss(reduction="sum")
-    criterion = FDE
+    criterion = SDE
 #     optimizer = torch.optim.Adagrad(vl.parameters(), weight_decay=0.0005)
     optimizer = torch.optim.Adam(vl.parameters(), weight_decay=0.0005)
     
