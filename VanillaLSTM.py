@@ -387,7 +387,8 @@ def train(T_obs, T_pred, files, model=None, name="model.pt"):
                             print(epoch, batch_idx, cost.item())
 
                         #save data for plotting
-                        plot_data[file][batch_idx].append(cost.item())
+                        # plot_data[file][batch_idx].append(cost.item())
+                        plot_data[file][batch_idx].append(cost)
 
                         #backward prop
                         optimizer.zero_grad()
