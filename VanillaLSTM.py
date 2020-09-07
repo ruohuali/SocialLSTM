@@ -541,8 +541,8 @@ def plotting_batch(batch_trajs_pred_gpu, part_masks, traj_num, batch_idx, coord_
         
     #plot
     plt.figure(figsize=(12,12))
-    plt.xlim([-20,20])
-    plt.ylim([-20,20])
+    plt.xlim([-5,20])
+    plt.ylim([-5,20])
     plot_idx = 0
     for traj_idx in parts:
         try:
