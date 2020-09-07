@@ -749,6 +749,6 @@ if __name__ == "__main__":
 
     # temp = train(8, 20, ["try_dataset.txt"])
     temp = torch.load("model.pt")
-    validate(temp, 8, 20, "try_dataset.txt")
+    validate(temp, 8, 20, "try_dataset1.txt")
 
 
