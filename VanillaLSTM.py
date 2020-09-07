@@ -316,7 +316,8 @@ def FDE(X, Y, in_list):
     # return Loss
     X_all = X.reshape(X.shape[0]*X.shape[1],X.shape[2])
     Y_all = Y.reshape(Y.shape[0]*Y.shape[1],Y.shape[2])
-    Loss = 0
+    Loss = torch.tensor(0., device=device)
+    pdb.set_trace()
     for traj_idx in in_list:
         dist = torch.dist(X_all, Y_all)
         Loss += dist
