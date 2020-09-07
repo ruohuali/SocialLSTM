@@ -277,14 +277,14 @@ def trajPruningByStride(part_mask, ref_tensor, in_tensors, length=0.3):
 
 
 '''pointless effort to make something right'''
-def SDE(X, Y):
-    X_all = X.reshape(X.shape[0]*X.shape[1],X.shape[2])
-    Y_all = Y.reshape(Y.shape[0]*Y.shape[1],Y.shape[2])
-    Loss = 0
-    for x, y in zip(X_all, Y_all):
-        dist = torch.dist(x, y)
-        Loss += dist
-    return Loss
+# def SDE(X, Y):
+#     X_all = X.reshape(X.shape[0]*X.shape[1],X.shape[2])
+#     Y_all = Y.reshape(Y.shape[0]*Y.shape[1],Y.shape[2])
+#     Loss = 0
+#     for x, y in zip(X_all, Y_all):
+#         dist = torch.dist(x, y)
+#         Loss += dist
+#     return Loss
 
 
 def in_list(part_mask, ref_tensor, in_tensors, length=0.3):
@@ -307,7 +307,7 @@ def FDE(X, Y, in_list):
 
     for traj_idx in range(X.shape[1]):
         fde = 0.
-        traj_mask = torch.tensor([[1.,1.] if i % (X.shape[1]-1) == traj_idx else [0.,0.] for i in range(X.shape[0]*X.shape[1])], device=device)
+        traj_mask = torch.tensor([[1.,1.] if i % X.shape[1] == traj_idx else [0.,0.] for i in range(X.shape[0]*X.shape[1])], device=device)
         x_traj = X_all*traj_mask
         y_traj = Y_all*traj_mask
         x_final = torch.sum(x_traj, axis=1)
@@ -316,7 +316,23 @@ def FDE(X, Y, in_list):
         Loss += fde
     return Loss
                 
+def SDE(X, Y, in_list):
+    X_all = X.reshape(X.shape[0]*X.shape[1],X.shape[2])
+    Y_all = Y.reshape(Y.shape[0]*Y.shape[1],Y.shape[2])    
+    Loss = torch.tensor(0. , device=device)
+    # pdb.set_trace()
 
+    for traj_idx in range(X.shape[1]):
+        for t in range(X.shape[0]):
+            de = 0.
+            traj_mask = torch.tensor([[1.,1.] if i % X.shape[1] == traj_idx and i // X.shape[1] <= t else [0.,0.] for i in range(X.shape[0]*X.shape[1])], device=device)
+            x_traj = X_all*traj_mask
+            y_traj = Y_all*traj_mask
+            x_t = torch.sum(x_traj, axis=1)
+            y_t = torch.sum(y_traj, axis=1)
+            de = torch.dist(x_sum, y_sum)
+            Loss += de
+    return Loss
 
 # %%
 def train(T_obs, T_pred, files, model=None, name="model.pt"):
