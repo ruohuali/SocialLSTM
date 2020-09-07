@@ -381,7 +381,7 @@ def train(T_obs, T_pred, files, model=None, name="model.pt"):
                         Y_pred = output[T_obs+1:T_pred]
                         Y_g = Y[T_obs+1:T_pred]
 
-                        cost = criterion(Y_pred, Y_g, part_list) + criterion1(Y_pred, Y_g)
+                        cost = 2*criterion(Y_pred, Y_g, part_list) + criterion1(Y_pred, Y_g)
 
                         if epoch % 10 == 9:
                             print(epoch, batch_idx, cost.item())
@@ -726,6 +726,11 @@ if __name__ == "__main__":
 
     # temp = train(8, 20, ["datasets/hotel/test/biwi_hotel.txt"])
     # validate(temp, 8, 20, "datasets/eth/test/biwi_eth.txt")
-    temp = torch.load("model.pt")
-    validate(temp, 8, 20, "datasets/hotel/test/biwi_hotel.txt")
+    # temp = torch.load("model.pt")
+    # validate(temp, 8, 20, "datasets/hotel/test/biwi_hotel.txt")
     # validate(temp, 8, 20, "datasets/eth/test/biwi_eth.txt")
+
+    temp = train(8, 20, ["try_dataset.txt"])
+    validate(temp, 8, 20, "try_dataset.txt")
+
+
