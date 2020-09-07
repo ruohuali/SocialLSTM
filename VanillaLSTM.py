@@ -330,7 +330,7 @@ def SDE(X, Y, in_list):
             y_traj = Y_all*traj_mask
             x_t = torch.sum(x_traj, axis=1)
             y_t = torch.sum(y_traj, axis=1)
-            de = torch.dist(x_sum, y_sum)
+            de = torch.dist(x_t, y_t)
             Loss += de
     return Loss
 
@@ -396,7 +396,7 @@ def train(T_obs, T_pred, files, model=None, name="model.pt"):
                         Y_pred = output[T_obs+1:T_pred]
                         Y_g = Y[T_obs+1:T_pred]
 
-                        cost = 10*criterion(Y_pred, Y_g, part_list)+criterion1(Y_pred, Y_g)
+                        cost = 10*criterion(Y_pred, Y_g, part_list)
 
                         if epoch % 10 == 9:
                             print(epoch, batch_idx, cost.item())
