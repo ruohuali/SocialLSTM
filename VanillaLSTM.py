@@ -307,7 +307,7 @@ def FDE(X, Y, in_list):
 
     for traj_idx in range(X.shape[1]):
         fde = 0.
-        traj_mask = torch.tensor([[1.,1.] if i % 20 == traj_idx else [0.,0.] for i in range(X.shape[0]*X.shape[1])], device=device)
+        traj_mask = torch.tensor([[1.,1.] if i % X.shape[0] == traj_idx else [0.,0.] for i in range(X.shape[0]*X.shape[1])], device=device)
         x_traj = X_all*traj_mask
         y_traj = Y_all*traj_mask
         x_final = torch.sum(x_traj, axis=1)
