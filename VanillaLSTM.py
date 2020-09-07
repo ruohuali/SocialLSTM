@@ -541,8 +541,8 @@ def plotting_batch(batch_trajs_pred_gpu, part_masks, traj_num, batch_idx, coord_
         
     #plot
     plt.figure(figsize=(12,12))
-    plt.xlim([0,15])
-    plt.ylim([0,15])
+    plt.xlim([0,20])
+    plt.ylim([0,20])
     plot_idx = 0
     for traj_idx in parts:
         try:
@@ -747,8 +747,8 @@ if __name__ == "__main__":
     # validate(temp, 8, 20, "datasets/hotel/test/biwi_hotel.txt")
     # validate(temp, 8, 20, "datasets/eth/test/biwi_eth.txt")
 
-    temp = train(8, 20, ["try_dataset.txt"])
-    # temp = torch.load("model.pt")
+    # temp = train(8, 20, ["try_dataset.txt"])
+    temp = torch.load("model.pt")
     validate(temp, 8, 20, "try_dataset.txt")
 
 
