@@ -350,9 +350,7 @@ def train(T_obs, T_pred, files, model=None, name="model.pt"):
     vl.to(device)
 
     #define loss & optimizer
-    criterion2 = FDE
-    criterion1 = nn.MSELoss(reduction="sum")
-    criterion = SDE
+    criterion = nn.MSELoss(reduction="sum")
 #     optimizer = torch.optim.Adagrad(vl.parameters(), weight_decay=0.0005)
     optimizer = torch.optim.Adam(vl.parameters(), weight_decay=0.0005)
     
@@ -361,7 +359,7 @@ def train(T_obs, T_pred, files, model=None, name="model.pt"):
     for file in files:
         plot_data[file] = [[] for _ in range(60)]
 
-    EPOCH = 100
+    EPOCH = 10
     for epoch in range(EPOCH):
         print(f"epoch {epoch+1}/{EPOCH}  ")
         for file in files:
@@ -397,7 +395,7 @@ def train(T_obs, T_pred, files, model=None, name="model.pt"):
                         Y_pred = output[T_obs+1:T_pred]
                         Y_g = Y[T_obs+1:T_pred]
 
-                        cost = criterion(Y_pred, Y_g, part_list)+criterion1(Y_pred, Y_g)
+                        cost = criterion(Y_pred, Y_g)
 
                         if epoch % 10 == 9:
                             print(epoch, batch_idx, cost.item())
@@ -679,36 +677,36 @@ def finalDispError(batch_trajs_pred_gpu, part_masks, traj_num, batch_idx, coord_
 # %%
 if __name__ == "__main__":
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-    print(f"device {device}\n") 
+    print(f"device {device}\n")
 
-#     train_datasets = ["datasets/eth/train",
-#                       "datasets/hotel/train",               
-#                       "datasets/univ/train",
-#                       "datasets/zara1/train",
-#                       "datasets/zara2/train"
-#                      ]
-#     val_datasets = ["datasets/eth/test",
-#                     "datasets/hotel/test",               
-#                     "datasets/univ/test",
-#                     "datasets/zara1/test",
-#                     "datasets/zara2/test"
-#                     ]
-#     names = ["eth_vl.pt",
-#              "hotel_vl.pt",
-#              "univ_vl.pt",
-#              "zara1_vl.pt",
-#              "zara2_vl.pt"
-#             ]
+    train_datasets = ["datasets/eth/train",
+                      "datasets/hotel/train",               
+                      "datasets/univ/train",
+                      "datasets/zara1/train",
+                      "datasets/zara2/train"
+                     ]
+    val_datasets = ["datasets/eth/test",
+                    "datasets/hotel/test",               
+                    "datasets/univ/test",
+                    "datasets/zara1/test",
+                    "datasets/zara2/test"
+                    ]
+    names = ["eth_vl.pt",
+             "hotel_vl.pt",
+             "univ_vl.pt",
+             "zara1_vl.pt",
+             "zara2_vl.pt"
+            ]
     
-#     for train_dataset, val_dataset, name in zip(train_datasets, val_datasets, names):
-#         #preparing training set
-#         files_dir = train_dataset
-#         print(f"pulling from dir {files_dir}")
-#         files = [join(files_dir, f) for f in listdir(files_dir) if isfile(join(files_dir, f))]
-#         vl = None
-#         #training
-#         for file in files:
-#             vl = train(8, 20, file, model=vl, name=name)
+    for train_dataset, val_dataset, name in zip(train_datasets, val_datasets, names):
+        #preparing training set
+        files_dir = train_dataset
+        print(f"pulling from dir {files_dir}")
+        files = [join(files_dir, f) for f in listdir(files_dir) if isfile(join(files_dir, f))]
+        vl = None
+        #training
+        for file in files:
+            vl = train(8, 20, file, model=vl, name=name)
 
 #         vl1 = torch.load(name)
 #         print(f"loading from {name}")
@@ -750,7 +748,7 @@ if __name__ == "__main__":
     # validate(temp, 8, 20, "datasets/eth/test/biwi_eth.txt")
 
     # temp = train(8, 20, ["try_dataset.txt"])
-    temp = torch.load("model.pt")
-    validate(temp, 8, 20, "try_dataset.txt")
+    # temp = torch.load("model.pt")
+    # validate(temp, 8, 20, "try_dataset.txt")
 
 
