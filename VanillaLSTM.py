@@ -339,12 +339,12 @@ def train(T_obs, T_pred, files, model=None, name="model.pt"):
     tic = time.time()
     print(f"totally training on {files}")    
     #params
-    h_dim = 16
+    h_dim = 6
     batch_size = T_pred
 
     if model == None:
         print("instantiating model")
-        vl = VanillaLSTM(hidden_dim=h_dim, mediate_dim=12, output_dim=2)
+        vl = VanillaLSTM(hidden_dim=h_dim, mediate_dim=6, output_dim=2)
     else:
         vl = model
     vl.to(device)
@@ -395,7 +395,7 @@ def train(T_obs, T_pred, files, model=None, name="model.pt"):
                         Y_pred = output[T_obs+1:T_pred]
                         Y_g = Y[T_obs+1:T_pred]
 
-                        cost = criterion(Y_pred, Y_g)+FDE(Y_pred, Y_g, in_list)
+                        cost = criterion(Y_pred, Y_g)
 
                         if epoch % 10 == 9:
                             print(epoch, batch_idx, cost.item())
@@ -443,7 +443,7 @@ def train(T_obs, T_pred, files, model=None, name="model.pt"):
 # %%
 def validate(model, T_obs, T_pred, file):
     #try to validate this
-    h_dim = 16
+    h_dim = 6
 
     batch_size = T_pred
 
