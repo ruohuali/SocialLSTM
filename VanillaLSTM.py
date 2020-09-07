@@ -342,6 +342,7 @@ def train(T_obs, T_pred, files, model=None, name="model.pt"):
     #define loss & optimizer
     criterion1 = nn.MSELoss(reduction="sum")
     criterion = FDE
+    criterion2 = SDE
 #     optimizer = torch.optim.Adagrad(vl.parameters(), weight_decay=0.0005)
     optimizer = torch.optim.Adam(vl.parameters(), weight_decay=0.0005)
     
@@ -386,7 +387,10 @@ def train(T_obs, T_pred, files, model=None, name="model.pt"):
                         Y_pred = output[T_obs+1:T_pred]
                         Y_g = Y[T_obs+1:T_pred]
 
-                        cost = 2*criterion(Y_pred, Y_g, part_list)
+                        cost1 = criterion(Y_pred, Y_g, part_list)
+                        cost = criterion2(Y_pred, Y_g)
+
+                        pdb.set_trace()
 
                         if epoch % 10 == 9:
                             print(epoch, batch_idx, cost.item())
