@@ -350,7 +350,7 @@ def train(T_obs, T_pred, files, model=None, name="model.pt"):
     vl.to(device)
 
     #define loss & optimizer
-    criterion = nn.MSELoss(reduction="sum")
+    criterion = nn.MSELoss(reduction="mean")
 #     optimizer = torch.optim.Adagrad(vl.parameters(), weight_decay=0.0005)
     optimizer = torch.optim.Adam(vl.parameters(), weight_decay=0.0005)
     
@@ -747,7 +747,7 @@ if __name__ == "__main__":
     # validate(temp, 8, 20, "datasets/hotel/test/biwi_hotel.txt")
     # validate(temp, 8, 20, "datasets/eth/test/biwi_eth.txt")
 
-    # temp = train(8, 20, ["try_dataset.txt"])
+    temp = train(8, 20, ["try_dataset.txt"])
     temp = torch.load("model.pt")
     validate(temp, 8, 20, "try_dataset1.txt")
 
