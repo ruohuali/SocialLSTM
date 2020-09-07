@@ -303,7 +303,7 @@ def FDE(X, Y, in_list):
     X_all = X.reshape(X.shape[0]*X.shape[1],X.shape[2])
     Y_all = Y.reshape(Y.shape[0]*Y.shape[1],Y.shape[2])    
     Loss = torch.tensor(0. , device=device)
-    pdb.set_trace()
+    # pdb.set_trace()
 
     for traj_idx in range(X.shape[1]):
         fde = 0.
