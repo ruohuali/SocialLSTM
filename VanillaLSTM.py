@@ -361,7 +361,7 @@ def train(T_obs, T_pred, files, model=None, name="model.pt"):
     for file in files:
         plot_data[file] = [[] for _ in range(60)]
 
-    EPOCH = 10
+    EPOCH = 100
     for epoch in range(EPOCH):
         print(f"epoch {epoch+1}/{EPOCH}  ")
         for file in files:
@@ -397,7 +397,7 @@ def train(T_obs, T_pred, files, model=None, name="model.pt"):
                         Y_pred = output[T_obs+1:T_pred]
                         Y_g = Y[T_obs+1:T_pred]
 
-                        cost = criterion2(Y_pred, Y_g, part_list)+criterion1(Y_pred, Y_g)
+                        cost = criterion(Y_pred, Y_g, part_list)+criterion1(Y_pred, Y_g)
 
                         if epoch % 10 == 9:
                             print(epoch, batch_idx, cost.item())
