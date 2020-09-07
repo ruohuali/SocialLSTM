@@ -300,27 +300,27 @@ def in_list(part_mask, ref_tensor, in_tensors, length=0.3):
 
 
 def FDE(X, Y, in_list):
-    # X_all = X.reshape(X.shape[0]*X.shape[1],X.shape[2])
-    # Y_all = Y.reshape(Y.shape[0]*Y.shape[1],Y.shape[2])    
-    # Loss = torch.tensor(0. , device=device)
-    # for traj_idx in in_list:
-    #     fde = torch.tensor(0., device=device)
-    #     # traj_mask = torch.tensor([[1.,1.] if i % 20 == traj_idx else [0.,0.] for i in range(X.shape[0]*X.shape[1])], device=device)
-    #     # x_traj = X_all*traj_mask
-    #     # y_traj = Y_all*traj_mask
-    #     # x_final = torch.sum(x_traj, axis=1)
-    #     # y_final = torch.sum(y_traj, axis=1)
-    #     # fde = torch.dist(x_final, y_final)
-    #     fde = X_all
-    #     Loss += fde
-    # return Loss
     X_all = X.reshape(X.shape[0]*X.shape[1],X.shape[2])
-    Y_all = Y.reshape(Y.shape[0]*Y.shape[1],Y.shape[2])
-    Loss = torch.tensor(0., device=device)
-    for traj_idx in in_list:
-        dist = torch.dist(X_all, Y_all)
-        Loss += dist
-    return Loss    
+    Y_all = Y.reshape(Y.shape[0]*Y.shape[1],Y.shape[2])    
+    Loss = torch.tensor(0. , device=device)
+    for traj_idx in range(X.shape[1]):
+        fde = torch.tensor(0., device=device)
+        traj_mask = torch.tensor([[1.,1.] if i % 20 == traj_idx else [0.,0.] for i in range(X.shape[0]*X.shape[1])], device=device)
+        x_traj = X_all*traj_mask
+        y_traj = Y_all*traj_mask
+        x_final = torch.sum(x_traj, axis=1)
+        y_final = torch.sum(y_traj, axis=1)
+        fde = torch.dist(x_final, y_final)
+        fde = X_all
+        Loss += fde
+    return Loss
+    # X_all = X.reshape(X.shape[0]*X.shape[1],X.shape[2])
+    # Y_all = Y.reshape(Y.shape[0]*Y.shape[1],Y.shape[2])
+    # Loss = torch.tensor(0., device=device)
+    # for traj_idx in range(X.shape[1]):
+    #     dist = torch.dist(X_all, Y_all)
+    #     Loss += dist
+    # return Loss    
                 
 
 
