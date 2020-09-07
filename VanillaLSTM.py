@@ -679,34 +679,34 @@ if __name__ == "__main__":
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     print(f"device {device}\n")
 
-    train_datasets = ["datasets/eth/train",
-                      "datasets/hotel/train",               
-                      "datasets/univ/train",
-                      "datasets/zara1/train",
-                      "datasets/zara2/train"
-                     ]
-    val_datasets = ["datasets/eth/test",
-                    "datasets/hotel/test",               
-                    "datasets/univ/test",
-                    "datasets/zara1/test",
-                    "datasets/zara2/test"
-                    ]
-    names = ["eth_vl.pt",
-             "hotel_vl.pt",
-             "univ_vl.pt",
-             "zara1_vl.pt",
-             "zara2_vl.pt"
-            ]
+    # train_datasets = ["datasets/eth/train",
+    #                   "datasets/hotel/train",               
+    #                   "datasets/univ/train",
+    #                   "datasets/zara1/train",
+    #                   "datasets/zara2/train"
+    #                  ]
+    # val_datasets = ["datasets/eth/test",
+    #                 "datasets/hotel/test",               
+    #                 "datasets/univ/test",
+    #                 "datasets/zara1/test",
+    #                 "datasets/zara2/test"
+    #                 ]
+    # names = ["eth_vl.pt",
+    #          "hotel_vl.pt",
+    #          "univ_vl.pt",
+    #          "zara1_vl.pt",
+    #          "zara2_vl.pt"
+    #         ]
     
-    for train_dataset, val_dataset, name in zip(train_datasets, val_datasets, names):
-        #preparing training set
-        files_dir = train_dataset
-        print(f"pulling from dir {files_dir}")
-        files = [join(files_dir, f) for f in listdir(files_dir) if isfile(join(files_dir, f))]
-        vl = None
-        #training
-        for file in files:
-            vl = train(8, 20, file, model=vl, name=name)
+    # for train_dataset, val_dataset, name in zip(train_datasets, val_datasets, names):
+    #     #preparing training set
+    #     files_dir = train_dataset
+    #     print(f"pulling from dir {files_dir}")
+    #     files = [join(files_dir, f) for f in listdir(files_dir) if isfile(join(files_dir, f))]
+    #     vl = None
+    #     #training
+    #     for file in files:
+    #         vl = train(8, 20, file, model=vl, name=name)
 
 #         vl1 = torch.load(name)
 #         print(f"loading from {name}")
@@ -747,8 +747,8 @@ if __name__ == "__main__":
     # validate(temp, 8, 20, "datasets/hotel/test/biwi_hotel.txt")
     # validate(temp, 8, 20, "datasets/eth/test/biwi_eth.txt")
 
-    # temp = train(8, 20, ["try_dataset.txt"])
+    temp = train(8, 20, ["try_dataset.txt"])
     # temp = torch.load("model.pt")
-    # validate(temp, 8, 20, "try_dataset.txt")
+    validate(temp, 8, 20, "try_dataset.txt")
 
 
