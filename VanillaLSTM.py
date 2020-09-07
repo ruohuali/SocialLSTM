@@ -343,7 +343,7 @@ def train(T_obs, T_pred, files, model=None, name="model.pt"):
 
     plot_data = {}
     for file in files:
-        plot_data[file] = [[] for _ in range(50)]
+        plot_data[file] = [[] for _ in range(60)]
 
     EPOCH = 10
     for epoch in range(EPOCH):
