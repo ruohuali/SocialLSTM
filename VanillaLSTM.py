@@ -331,7 +331,7 @@ def SDE(X, Y, in_list):
             x_t = torch.sum(x_traj, axis=1)
             y_t = torch.sum(y_traj, axis=1)
             de = torch.dist(x_t, y_t)
-            Loss += 1.5*t*de
+            Loss += ((t+1)/10+1)*de
     return Loss
 
 # %%
