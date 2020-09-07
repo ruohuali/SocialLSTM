@@ -317,7 +317,6 @@ def FDE(X, Y, in_list):
     X_all = X.reshape(X.shape[0]*X.shape[1],X.shape[2])
     Y_all = Y.reshape(Y.shape[0]*Y.shape[1],Y.shape[2])
     Loss = torch.tensor(0., device=device)
-    pdb.set_trace()
     for traj_idx in in_list:
         dist = torch.dist(X_all, Y_all)
         Loss += dist
@@ -388,10 +387,8 @@ def train(T_obs, T_pred, files, model=None, name="model.pt"):
                         Y_pred = output[T_obs+1:T_pred]
                         Y_g = Y[T_obs+1:T_pred]
 
-                        cost1 = criterion(Y_pred, Y_g, part_list)
-                        cost = criterion2(Y_pred, Y_g)
-
-                        pdb.set_trace()
+                        cost = criterion(Y_pred, Y_g, part_list)
+                        # cost = criterion2(Y_pred, Y_g)
 
                         if epoch % 10 == 9:
                             print(epoch, batch_idx, cost.item())
