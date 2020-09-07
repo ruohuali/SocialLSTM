@@ -331,7 +331,7 @@ def SDE(X, Y, in_list):
             x_t = torch.sum(x_traj, axis=1)
             y_t = torch.sum(y_traj, axis=1)
             de = torch.dist(x_t, y_t)
-            Loss += de
+            Loss += 10*t*de
     return Loss
 
 # %%
@@ -360,7 +360,7 @@ def train(T_obs, T_pred, files, model=None, name="model.pt"):
     for file in files:
         plot_data[file] = [[] for _ in range(60)]
 
-    EPOCH = 100
+    EPOCH = 10
     for epoch in range(EPOCH):
         print(f"epoch {epoch+1}/{EPOCH}  ")
         for file in files:
