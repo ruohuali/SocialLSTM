@@ -381,7 +381,7 @@ def train(T_obs, T_pred, files, model=None, name="model.pt"):
                         Y_pred = output[T_obs+1:T_pred]
                         Y_g = Y[T_obs+1:T_pred]
 
-                        cost = criterion1(Y_pred, Y_g)
+                        cost = 2*criterion(Y_pred, Y_g, part_list)
 
                         if epoch % 10 == 9:
                             print(epoch, batch_idx, cost.item())
