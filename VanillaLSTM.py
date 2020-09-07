@@ -331,7 +331,7 @@ def SDE(X, Y, in_list):
             x_t = torch.sum(x_traj, axis=1)
             y_t = torch.sum(y_traj, axis=1)
             de = torch.dist(x_t, y_t)
-            Loss += ((t+1)/10+1)*de
+            Loss += de
     return Loss
 
 # %%
@@ -350,6 +350,7 @@ def train(T_obs, T_pred, files, model=None, name="model.pt"):
     vl.to(device)
 
     #define loss & optimizer
+    criterion2 = FDE
     criterion1 = nn.MSELoss(reduction="sum")
     criterion = SDE
 #     optimizer = torch.optim.Adagrad(vl.parameters(), weight_decay=0.0005)
@@ -396,7 +397,7 @@ def train(T_obs, T_pred, files, model=None, name="model.pt"):
                         Y_pred = output[T_obs+1:T_pred]
                         Y_g = Y[T_obs+1:T_pred]
 
-                        cost = criterion(Y_pred, Y_g, part_list)+criterion1(Y_pred, Y_g)
+                        cost = criterion(Y_pred, Y_g, part_list)+criterion1(Y_pred, Y_g)+2*criterion2(Y_pred, Y_g, part_list)
 
                         if epoch % 10 == 9:
                             print(epoch, batch_idx, cost.item())
