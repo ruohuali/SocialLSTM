@@ -551,7 +551,7 @@ def plotting_batch(batch_trajs_pred_gpu, part_masks, traj_num, batch_idx, coord_
             print("not enough appearance")
             continue
         pred_y = trajs_pred_coords[traj_idx][:,1]            
-        plt.plot(pred_x, pred_y, label="pred"+str(traj_idx), marker=".")
+        plt.plot(pred_x, pred_y, label="pred"+str(traj_idx))
         for i, (x, y) in enumerate(zip(pred_x, pred_y)):
             if i < len(pred_x)-1:
                 try:
@@ -564,7 +564,7 @@ def plotting_batch(batch_trajs_pred_gpu, part_masks, traj_num, batch_idx, coord_
         total_y = batch_coords[:,traj_idx,3]
         total_y = total_y[np.where(total_y != 0.)]       
         try:
-            plt.plot(total_x, total_y, linestyle="dashed", label="total"+str(traj_idx), marker=".")
+            plt.plot(total_x, total_y, linestyle="dashed", label="total"+str(traj_idx))
         except ValueError:
             print("plot error")
             
