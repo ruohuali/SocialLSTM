@@ -184,6 +184,18 @@ class FramesDataset(Dataset):
 
 
 # %%
+class LinearNet(nn.Module):
+    ''' a non-linear layer'''
+    def __init__(self, input_dim, output_dim, l1_dim=4, l2_dim=12, l3_dim=36):
+        super(LinearNet, self).__init__()
+        self.lin1 = nn.Linear(input_dim, l1_dim)
+        self.lin2 = nn.Linear(l1_dim, l2_dim)
+        self.lin3 = nn.Linear(l2_dim, l3_dim)
+        self.lin4 = nn.Linear(l3_dim, output_dim)
+
+    def forward(self, x):
+        return self.
+
 class Phi(nn.Module):
     ''' a non-linear layer'''
     def __init__(self, dropout_prob):
@@ -197,7 +209,7 @@ class Phi(nn.Module):
 
 
 class VanillaLSTM(nn.Module):
-    def __init__(self, input_dim=2, hidden_dim=20, mediate_dim=10, output_dim=2, dropout_prob=0.2):
+    def __init__(self, input_dim=2, hidden_dim=20, mediate_dim=10, output_dim=2, dropout_prob=0):
         super(VanillaLSTM, self).__init__()
         self.output_dim = output_dim
         self.hidden_dim = hidden_dim
@@ -366,7 +378,7 @@ def train(T_obs, T_pred, files, model=None, name="model.pt"):
     #define loss & optimizer
     criterion = nn.MSELoss(reduction="sum")
     # optimizer = torch.optim.Adagrad(vl.parameters(), weight_decay=0.0005)
-    optimizer = torch.optim.Adam(vl.parameters(), lr=0.01, weight_decay=0.0005)
+    optimizer = torch.optim.Adam(vl.parameters(), weight_decay=0.0005)
     # optimizer = torch.optim.SGD(vl.parameters(), lr=0.001, weight_decay=0.0005, momentum=0.9)
     
 
