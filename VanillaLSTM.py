@@ -421,7 +421,7 @@ def train(T_obs, T_pred, files, model=None, name="model.pt"):
                         Y_g = Y[T_obs+1:T_pred]
 
                         cost = criterion(Y_pred, Y_g)
-                        print(f"c {criterion(Y_pred, Y_g)}, s {strideReg(Y_pred)}")
+                        print(f"c {criterion(Y_pred, Y_g)}, s {strideReg(Y_pred, Y_g)}")
 
                         if epoch % 10 == 9:
                             print(epoch, batch_idx, cost.item())
