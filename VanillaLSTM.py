@@ -185,7 +185,6 @@ class FramesDataset(Dataset):
 
 # %%
 class LinearNet(nn.Module):
-    ''' a non-linear layer'''
     def __init__(self, input_dim, output_dim, l1_dim=4, l2_dim=12, l3_dim=36):
         super(LinearNet, self).__init__()
         self.lin1 = nn.Linear(input_dim, l1_dim)
@@ -194,7 +193,8 @@ class LinearNet(nn.Module):
         self.lin4 = nn.Linear(l3_dim, output_dim)
 
     def forward(self, x):
-        return self.
+        return self.lin4(self.lin3(self.lin2(self.lin1(x))))
+
 
 class Phi(nn.Module):
     ''' a non-linear layer'''
@@ -217,6 +217,7 @@ class VanillaLSTM(nn.Module):
         self.LSTMCell = nn.LSTMCell(mediate_dim, hidden_dim)
         self.OutputLayer = nn.Linear(hidden_dim, output_dim)
         self.Phi = Phi(dropout_prob=dropout_prob)
+        self.LinearNet = LinearNet(input_dim=input_dim, output_dim=mediate_dim)
 
 
     def forward(self, X, part_masks, all_h_t, all_c_t, Y, T_obs, T_pred):
@@ -227,13 +228,15 @@ class VanillaLSTM(nn.Module):
                 continue
                 
             elif frame_idx <= T_obs:
-                r = self.Phi(self.InputLayer(x[:,2:]))
+                # r = self.Phi(self.InputLayer(x[:,2:]))
+                r = self.LinearNet(x[:,2:])
                 all_h_t, all_c_t = self.LSTMCell(r, (all_h_t, all_c_t))
                 part_mask = torch.t(part_masks[frame_idx]).expand(part_masks[frame_idx].shape[1], self.output_dim)
                 outputs[frame_idx] = self.OutputLayer(all_h_t) * part_mask
                 
             elif frame_idx > T_obs and frame_idx <= T_pred:
-                r = self.Phi(self.InputLayer(outputs[frame_idx-1].clone()))
+                # r = self.Phi(self.InputLayer(outputs[frame_idx-1].clone()))
+                r = self.LinearNet(outputs[frame_idx-1].clone())
                 all_h_t, all_c_t = self.LSTMCell(r, (all_h_t, all_c_t))
                 part_mask = torch.t(part_masks[frame_idx]).expand(part_masks[frame_idx].shape[1], self.output_dim)
                 outputs[frame_idx] = self.OutputLayer(all_h_t) * part_mask                
@@ -422,7 +425,7 @@ def train(T_obs, T_pred, files, model=None, name="model.pt"):
                         Y_pred = output[T_obs+1:T_pred]
                         Y_g = Y[T_obs+1:T_pred]
 
-                        cost = criterion(Y_pred, Y_g)+strideReg(Y_pred)
+                        cost = criterion(Y_pred, Y_g)
                         # print(f"c {criterion(Y_pred, Y_g)}, s {strideReg(Y_pred)}")
 
                         if epoch % 10 == 9:
