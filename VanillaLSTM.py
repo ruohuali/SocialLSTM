@@ -185,7 +185,7 @@ class FramesDataset(Dataset):
 
 # %%
 class LinearNet(nn.Module):
-    def __init__(self, input_dim, output_dim, l1_dim=6, l2_dim=12, l3_dim=36, l4=64):
+    def __init__(self, input_dim, output_dim, l1_dim=6, l2_dim=12, l3_dim=36, l4_dim=64):
         super(LinearNet, self).__init__()
         self.lin1 = nn.Linear(input_dim, l1_dim)
         self.lin2 = nn.Linear(l1_dim, l2_dim)
@@ -194,7 +194,7 @@ class LinearNet(nn.Module):
         self.lin5 = nn.Linear(l4_dim, output_dim)
 
     def forward(self, x):
-        return self.lin4(self.lin3(self.lin2(self.lin1(x))))
+        return self.lin5(self.lin4(self.lin3(self.lin2(self.lin1(x)))))
 
 
 class Phi(nn.Module):
@@ -386,7 +386,7 @@ def train(T_obs, T_pred, files, model=None, name="model.pt"):
     for file in files:
         plot_data[file] = [[] for _ in range(60)]
 
-    EPOCH = 100
+    EPOCH = 50
     for epoch in range(EPOCH):
         print(f"epoch {epoch+1}/{EPOCH}  ")
         for file in files:
