@@ -354,7 +354,7 @@ def strideReg(X, Y):
     X_all = X.reshape(X.shape[0]*X.shape[1],X.shape[2])
     X_total_len = torch.sum(torch.abs(X_all))
     Y_total_len = torch.sum(torch.abs(X_all))
-    Loss = Y_len - total_len
+    Loss = Y_total_len - total_len
     return torch.abs(Loss)
 
 
