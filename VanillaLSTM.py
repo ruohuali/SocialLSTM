@@ -344,7 +344,7 @@ def train(T_obs, T_pred, files, model=None, name="model.pt"):
 
     if model == None:
         print("instantiating model")
-        vl = VanillaLSTM(hidden_dim=h_dim, mediate_dim=24, output_dim=2)
+        vl = VanillaLSTM(hidden_dim=h_dim, mediate_dim=6, output_dim=2)
     else:
         vl = model
     vl.to(device)
@@ -416,6 +416,7 @@ def train(T_obs, T_pred, files, model=None, name="model.pt"):
     #plot cost
     def ppp(v,j):
         plt.figure()
+        plt.title(str(vl.mediate_dim)+str(vl.hidden_dim))
         for i, data in enumerate(v):
             if len(data) != 0:
                 plt.plot(np.arange(len(v[0])), data)        
