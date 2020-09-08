@@ -13,6 +13,7 @@ import matplotlib.pyplot as plt
 from os import listdir
 from os.path import isfile, join
 import warnings
+warnings.filterwarnings("ignore", category=RuntimeWarning) 
 
 
 # %%
@@ -185,7 +186,7 @@ class FramesDataset(Dataset):
 
 # %%
 class LinearNet(nn.Module):
-    def __init__(self, input_dim, output_dim, l1_dim=6, l2_dim=12, l3_dim=36, l4_dim=64):
+    def __init__(self, input_dim, output_dim, l1_dim=6, l2_dim=32, l3_dim=64, l4_dim=100):
         super(LinearNet, self).__init__()
         self.lin1 = nn.Linear(input_dim, l1_dim)
         self.lin2 = nn.Linear(l1_dim, l2_dim)
@@ -365,7 +366,7 @@ def train(T_obs, T_pred, files, model=None, name="model.pt"):
     tic = time.time()
     print(f"totally training on {files}")    
     #params
-    h_dim = 64
+    h_dim = 128
     batch_size = T_pred
 
     if model == None:
@@ -472,7 +473,7 @@ def train(T_obs, T_pred, files, model=None, name="model.pt"):
 # %%
 def validate(model, T_obs, T_pred, file):
     #try to validate this
-    h_dim = 64
+    h_dim = 128
 
     batch_size = T_pred
 
@@ -777,5 +778,5 @@ if __name__ == "__main__":
     # validate(temp, 8, 20, "datasets/eth/test/biwi_eth.txt")
 
     # temp = train(8, 20, ["try_dataset.txt"])
-    temp = torch.load("model.pt")
-    validate(temp, 8, 20, "datasets/eth/test/biwi_eth.txt")
+    # temp = torch.load("model.pt")
+    # validate(temp, 8, 20, "datasets/eth/test/biwi_eth.txt")
