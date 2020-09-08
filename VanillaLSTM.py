@@ -416,7 +416,7 @@ def train(T_obs, T_pred, files, model=None, name="model.pt"):
     #plot cost
     def ppp(v,j):
         plt.figure()
-        plt.title(str(vl.mediate_dim)+str(vl.hidden_dim))
+        plt.title(str(vl.hidden_dim))
         for i, data in enumerate(v):
             if len(data) != 0:
                 plt.plot(np.arange(len(v[0])), data)        
