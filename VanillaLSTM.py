@@ -334,6 +334,20 @@ def SDE(X, Y, in_list):
             Loss += de
     return Loss
 
+
+def strideReg(X):
+    X_all = X.reshape(X.shape[0]*X.shape[1],X.shape[2])
+    total_len = torch.sum(torch.abs(X_all))
+    non_zeros = 0
+    for i in range(X.shape[0]*X.shape[1]):
+        if X_all[i][0] != 0.:
+            non_zeros += 1
+    One_all = torch.ones(non_zeros,X.shape[2])
+    one_len = torch.sum(One_all)
+    Loss = one_len - total_len
+    return torch.abs(Loss)
+
+
 # %%
 def train(T_obs, T_pred, files, model=None, name="model.pt"):
     tic = time.time()
@@ -360,7 +374,7 @@ def train(T_obs, T_pred, files, model=None, name="model.pt"):
     for file in files:
         plot_data[file] = [[] for _ in range(60)]
 
-    EPOCH = 100
+    EPOCH = 50
     for epoch in range(EPOCH):
         print(f"epoch {epoch+1}/{EPOCH}  ")
         for file in files:
@@ -396,7 +410,8 @@ def train(T_obs, T_pred, files, model=None, name="model.pt"):
                         Y_pred = output[T_obs+1:T_pred]
                         Y_g = Y[T_obs+1:T_pred]
 
-                        cost = criterion(Y_pred, Y_g)
+                        cost = criterion(Y_pred, Y_g)+strideReg(Y_pred)
+                        # print(f"c {criterion(Y_pred, Y_g)}, s {strideReg(Y_pred)}")
 
                         if epoch % 10 == 9:
                             print(epoch, batch_idx, cost.item())
