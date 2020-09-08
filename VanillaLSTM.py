@@ -352,10 +352,11 @@ def SDE(X, Y, in_list):
 
 def strideReg(X, Y):
     X_all = X.reshape(X.shape[0]*X.shape[1],X.shape[2])
+    Y_all = Y.reshape(Y.shape[0]*Y.shape[1],Y.shape[2])    
     X_total_len = torch.sum(torch.abs(X_all))
-    Y_total_len = torch.sum(torch.abs(X_all))
-    Loss = Y_total_len - total_len
-    return torch.abs(Loss)
+    Y_total_len = torch.sum(torch.abs(Y_all))
+    Loss = torch.abs(Y_total_len - X_total_len)
+    return Loss
 
 
 # %%
@@ -420,8 +421,8 @@ def train(T_obs, T_pred, files, model=None, name="model.pt"):
                         Y_pred = output[T_obs+1:T_pred]
                         Y_g = Y[T_obs+1:T_pred]
 
-                        cost = criterion(Y_pred, Y_g)
-                        print(f"c {criterion(Y_pred, Y_g)}, s {strideReg(Y_pred, Y_g)}")
+                        cost = criterion(Y_pred, Y_g)+strideReg(Y_pred, Y_g)
+                        # print(f"c {criterion(Y_pred, Y_g)}, s {strideReg(Y_pred, Y_g)}")
 
                         if epoch % 10 == 9:
                             print(epoch, batch_idx, cost.item())
