@@ -472,7 +472,7 @@ def train(T_obs, T_pred, files, model=None, name="model.pt"):
 # %%
 def validate(model, T_obs, T_pred, file):
     #try to validate this
-    h_dim = 32
+    h_dim = 64
 
     batch_size = T_pred
 
@@ -776,6 +776,6 @@ if __name__ == "__main__":
     # validate(temp, 8, 20, "datasets/hotel/test/biwi_hotel.txt")
     # validate(temp, 8, 20, "datasets/eth/test/biwi_eth.txt")
 
-    temp = train(8, 20, ["try_dataset.txt"])
+    # temp = train(8, 20, ["try_dataset.txt"])
     temp = torch.load("model.pt")
     validate(temp, 8, 20, "datasets/eth/test/biwi_eth.txt")
