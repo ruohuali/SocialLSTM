@@ -354,7 +354,7 @@ def strideReg(X, Y):
     X_all = X.reshape(X.shape[0]*X.shape[1],X.shape[2])
     Y_all = Y.reshape(Y.shape[0]*Y.shape[1],Y.shape[2])    
     X_total_len = torch.sum(torch.abs(X_all))
-    Y_total_len = torch.sum(torch.abs(Y_all))
+    Y_total_len = 1.5*torch.sum(torch.abs(Y_all))
     Loss = torch.abs(Y_total_len - X_total_len)
     return Loss
 
@@ -385,7 +385,7 @@ def train(T_obs, T_pred, files, model=None, name="model.pt"):
     for file in files:
         plot_data[file] = [[] for _ in range(60)]
 
-    EPOCH = 50
+    EPOCH = 100
     for epoch in range(EPOCH):
         print(f"epoch {epoch+1}/{EPOCH}  ")
         for file in files:
