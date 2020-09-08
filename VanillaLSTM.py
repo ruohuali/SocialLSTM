@@ -364,12 +364,12 @@ def train(T_obs, T_pred, files, model=None, name="model.pt"):
     tic = time.time()
     print(f"totally training on {files}")    
     #params
-    h_dim = 6
+    h_dim = 32
     batch_size = T_pred
 
     if model == None:
         print("instantiating model")
-        vl = VanillaLSTM(hidden_dim=h_dim, mediate_dim=6, output_dim=2)
+        vl = VanillaLSTM(hidden_dim=h_dim, mediate_dim=24, output_dim=2)
     else:
         vl = model
     vl.to(device)
@@ -471,7 +471,7 @@ def train(T_obs, T_pred, files, model=None, name="model.pt"):
 # %%
 def validate(model, T_obs, T_pred, file):
     #try to validate this
-    h_dim = 6
+    h_dim = 32
 
     batch_size = T_pred
 
