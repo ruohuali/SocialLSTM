@@ -185,12 +185,13 @@ class FramesDataset(Dataset):
 
 # %%
 class LinearNet(nn.Module):
-    def __init__(self, input_dim, output_dim, l1_dim=4, l2_dim=12, l3_dim=36):
+    def __init__(self, input_dim, output_dim, l1_dim=6, l2_dim=12, l3_dim=36, l4=64):
         super(LinearNet, self).__init__()
         self.lin1 = nn.Linear(input_dim, l1_dim)
         self.lin2 = nn.Linear(l1_dim, l2_dim)
         self.lin3 = nn.Linear(l2_dim, l3_dim)
-        self.lin4 = nn.Linear(l3_dim, output_dim)
+        self.lin4 = nn.Linear(l3_dim, l4_dim)
+        self.lin5 = nn.Linear(l4_dim, output_dim)
 
     def forward(self, x):
         return self.lin4(self.lin3(self.lin2(self.lin1(x))))
@@ -364,12 +365,12 @@ def train(T_obs, T_pred, files, model=None, name="model.pt"):
     tic = time.time()
     print(f"totally training on {files}")    
     #params
-    h_dim = 32
+    h_dim = 64
     batch_size = T_pred
 
     if model == None:
         print("instantiating model")
-        vl = VanillaLSTM(hidden_dim=h_dim, mediate_dim=24, output_dim=2)
+        vl = VanillaLSTM(hidden_dim=h_dim, mediate_dim=32, output_dim=2)
     else:
         vl = model
     vl.to(device)
