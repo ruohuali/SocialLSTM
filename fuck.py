@@ -1,9 +1,13 @@
 from VanillaLSTM import *
 
-def visualize(dataset, batch_size, name="try"):
-    for 
+def visualizeFile(file, batch_size, name="try"):
+    dataset = FramesDataset(file)
+    dataloader = DataLoader(dataset, batch_size=batch_size)
+    for batch_idx, data in enumerate(dataloader):
+        batch_coords = data['coords']
+        visualizeBatch(batch_coords.cpu().data)
 
-def visualizeBatch():
+def visualizeBatch(batch_coords, batch_idx):
     #plot
     plt.figure(figsize=(12,12))
     plt.xlim([-2,15])
