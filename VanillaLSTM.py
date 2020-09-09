@@ -105,6 +105,8 @@ class FramesDataset(Dataset):
     
 
     def __init__(self, path):
+        # global device 
+        # device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
         self.traj_list, self.participant_masks, self.off_data, self.coord_data = self.preprocess(path)
         
 
