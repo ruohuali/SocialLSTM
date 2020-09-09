@@ -418,7 +418,8 @@ def train(T_obs, T_pred, files, model=None, name="model.pt"):
                         # part_list = in_list(pr_masks, input_seq, (input_seq, Y, pr_masks))   
                         
                         #forward prop
-                        output = vl(input_seq, pr_masks, h, c, Y, T_obs, T_pred)
+                        # output = vl(input_seq, pr_masks, h, c, Y, T_obs, T_pred)
+                        output = model(input_seq, part_masks, h, c, Y, T_obs, T_pred)
 
                         #compute loss
                         Y_pred = output[T_obs+1:T_pred]
@@ -508,7 +509,8 @@ def validate(model, T_obs, T_pred, file):
                 # (input_seq, Y, pr_masks) = trajPruningByStride(pr_masks, input_seq, (input_seq, Y, pr_masks))
                 
                 #forward prop
-                output = model(input_seq, pr_masks, h, c, Y, T_obs, T_pred)
+                # output = model(input_seq, pr_masks, h, c, Y, T_obs, T_pred)
+                output = model(input_seq, part_masks, h, c, Y, T_obs, T_pred)
 
                 #compute cost
                 Y_pred = output[T_obs+1:T_pred]
