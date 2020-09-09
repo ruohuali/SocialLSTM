@@ -413,9 +413,9 @@ def train(T_obs, T_pred, files, model=None, name="model.pt"):
                         run_ratio = (T_obs+2)/T_pred
                         input_seq = trajPruningByAppear(part_masks, ratio=run_ratio, in_tensor=input_seq) 
                         Y = trajPruningByAppear(part_masks, ratio=run_ratio, in_tensor=Y)     
-                        pr_masks = trajPruningByAppear(part_masks, ratio=run_ratio)         
-                        (input_seq, Y, pr_masks) = trajPruningByStride(pr_masks, input_seq, (input_seq, Y, pr_masks))   
-                        part_list = in_list(pr_masks, input_seq, (input_seq, Y, pr_masks))   
+                        # pr_masks = trajPruningByAppear(part_masks, ratio=run_ratio)         
+                        # (input_seq, Y, pr_masks) = trajPruningByStride(pr_masks, input_seq, (input_seq, Y, pr_masks))   
+                        # part_list = in_list(pr_masks, input_seq, (input_seq, Y, pr_masks))   
                         
                         #forward prop
                         output = vl(input_seq, pr_masks, h, c, Y, T_obs, T_pred)
@@ -504,8 +504,8 @@ def validate(model, T_obs, T_pred, file):
                 run_ratio = (T_obs+2)/T_pred
                 input_seq = trajPruningByAppear(part_masks, ratio=run_ratio, in_tensor=input_seq) 
                 Y = trajPruningByAppear(part_masks, ratio=run_ratio, in_tensor=Y)     
-                pr_masks = trajPruningByAppear(part_masks, ratio=run_ratio)
-                (input_seq, Y, pr_masks) = trajPruningByStride(pr_masks, input_seq, (input_seq, Y, pr_masks))
+                # pr_masks = trajPruningByAppear(part_masks, ratio=run_ratio)
+                # (input_seq, Y, pr_masks) = trajPruningByStride(pr_masks, input_seq, (input_seq, Y, pr_masks))
                 
                 #forward prop
                 output = model(input_seq, pr_masks, h, c, Y, T_obs, T_pred)
