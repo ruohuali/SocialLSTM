@@ -373,6 +373,7 @@ def train(T_obs, T_pred, files, model=None, name="model.pt"):
         print("instantiating model")
         vl = VanillaLSTM(hidden_dim=h_dim, mediate_dim=32, output_dim=2)
     else:
+        print("reading")
         vl = model
     vl.to(device)
 
@@ -755,9 +756,9 @@ if __name__ == "__main__":
     name = "eth_vl.pt"
     print(f"pulling from dir {files_dir}")
     files = [join(files_dir, f) for f in listdir(files_dir) if isfile(join(files_dir, f))]
-    vl = None
+    vl = torch.load("eth_vl.pt")
     #training
-    vl = train(8, 20, files, name=name)
+    vl = train(8, 20, files, name=name, model=vl)
 
     torch.cuda.empty_cache()
     vl1 = torch.load("eth_vl.pt")
