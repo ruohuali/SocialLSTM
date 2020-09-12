@@ -185,8 +185,6 @@ class FramesDataset(Dataset):
 
 
     def __init__(self, path, length=20, ratio=0.9, special=False):
-        global device
-        device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
         if not special:
             self.source_file = self.storeFile(path)
             self.data_packets = []
@@ -539,6 +537,38 @@ def validate(model, T_obs, T_pred, file):
 
 
 # %%
+def ADE(X, Y):
+    result = 0.
+    for traj_idx in range(X.shape[1]):
+        dist = 0.
+        pos_X, pos_Y = torch.tensor([0.,0.], device=device), torch.tensor([0.,0.], device=device)
+        for t in range(X.shape[0]):
+            pos_X += X[t,traj_idx]
+            pos_Y += Y[t,traj_idx]
+            dist += torch.dist(pos_Y, pos_X)
+        dist /= X.shape[0]
+        result += dist
+    result /= X.shape[1]
+    print(f"avg disp error {result}")
+    return result    
+
+
+def FDE(X, Y):
+    result = 0.
+    for traj_idx in range(X.shape[1]):
+        dist = 0.
+        pos_X, pos_Y = torch.tensor([0.,0.], device=device), torch.tensor([0.,0.], device=device)
+        for t in range(X.shape[0]):
+            pos_X += X[t,traj_idx]
+            pos_Y += Y[t,traj_idx]
+        dist += torch.dist(pos_Y, pos_X)
+        result += dist
+    result /= X.shape[1]
+    print(f"final disp error {result}")
+    return result        
+
+
+# %%
 def plotting_batch(batch_trajs_pred_gpu, input_seq, dataset, T_obs, is_total, batch_idx):          
     #reform the trajs tensor to a list of each traj's pos at each frame
     batch_trajs_pred = batch_trajs_pred_gpu.cpu().data.numpy()
@@ -616,40 +646,12 @@ def plotting_batch(batch_trajs_pred_gpu, input_seq, dataset, T_obs, is_total, ba
     plt.savefig("eth_plots/"+str(batch_idx)+str(is_total)+"6-6-20-all")    
 
 
-def ADE(X, Y):
-    result = 0.
-    for traj_idx in range(X.shape[1]):
-        dist = 0.
-        pos_X, pos_Y = torch.tensor([0.,0.], device=device), torch.tensor([0.,0.], device=device)
-        for t in range(X.shape[0]):
-            pos_X += X[t,traj_idx]
-            pos_Y += Y[t,traj_idx]
-            dist += torch.dist(pos_Y, pos_X)
-        dist /= X.shape[0]
-        result += dist
-    result /= X.shape[1]
-    print(f"avg disp error {result}")
-    return result    
-
-
-def FDE(X, Y):
-    result = 0.
-    for traj_idx in range(X.shape[1]):
-        dist = 0.
-        pos_X, pos_Y = torch.tensor([0.,0.], device=device), torch.tensor([0.,0.], device=device)
-        for t in range(X.shape[0]):
-            pos_X += X[t,traj_idx]
-            pos_Y += Y[t,traj_idx]
-        dist += torch.dist(pos_Y, pos_X)
-        result += dist
-    result /= X.shape[1]
-    print(f"final disp error {result}")
-    return result        
-
 
 # %%
 if __name__ == "__main__":
-    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+    # device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+    global device
+    device = torch.device("cpu")
     print(f"device {device}\n")
 
 #     # train_datasets = ["datasets/eth/train",
@@ -721,4 +723,4 @@ if __name__ == "__main__":
 
     # temp = train(8, 20, ["datasets/eth/test/biwi_eth.txt"])
     temp = torch.load("eth_vl.pt")
-    validate(temp, 20, 20, "x_all.p")
+    validate(temp, 20, 40, "x_all.p")
