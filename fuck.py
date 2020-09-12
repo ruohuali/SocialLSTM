@@ -1,13 +1,13 @@
 from VanillaLSTM import *
 
 def visualizeFile(file, T_obs, T_pred):
-    print(f"file {file}")
+    print(f"vvvv file {file}")
     dataset = FramesDataset(file)
     dataloader = DataLoader(dataset, batch_size=T_pred)
     for batch_idx, data in enumerate(dataloader):
-        print(f"batch {batch}")
+        print(f"vvvv batch {batch_idx}")
         batch_coords = data['coords']
-        visualizeBatch(batch_coords.cpu().data.numpy(), batch_idx, T_obs, name=file.replace(".txt",""))
+        visualizeBatch(batch_coords.cpu().data.numpy(), batch_idx, T_obs, name=file.replace(".txt","").replace("/","&"))
 
 def visualizeBatch(batch_coords, batch_idx, T_obs, name="name"):
     #plot
@@ -23,7 +23,7 @@ def visualizeBatch(batch_coords, batch_idx, T_obs, name="name"):
         obs_x, obs_y = batch_coords[T_obs,traj_idx,2], batch_coords[T_obs,traj_idx,3]  
         try:
             plt.plot(total_x, total_y, linestyle="dashed", label="total"+str(traj_idx))
-            plt.plot(obs_x, obs_y, label="total"+str(traj_idx), marker='*')
+            plt.plot(obs_x, obs_y, label="total"+str(traj_idx), marker='*', color='r')
         except ValueError:
             print("plot error")
             

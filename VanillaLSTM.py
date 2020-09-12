@@ -148,6 +148,7 @@ class FramesDataset(Dataset):
             time_step = file_data[i+1][0]-file_data[i][0]
             if time_step != 0:
                 break
+        self.time_step = time_step
 
         time_stamps = self.IdLongTrajs(length*ratio)
 
@@ -173,6 +174,7 @@ class FramesDataset(Dataset):
         self.data_packets = []
         self.preprocess(length, ratio)
         self.backCompatible(path)
+        self.trajs_coords = self.gatherCoordinates()
 
 
     def __len__(self):
@@ -195,29 +197,34 @@ class FramesDataset(Dataset):
     
     def getParticipants(self):
         return self.participant_mask
-    
-    
-    def getCoordinates(self, seq):
-        #get the coord data at the time step right before the seq starts
-        before_coords = torch.empty(len(self.traj_list), 4, device=device)
-        for x in seq:
-            for i, coords in enumerate(self.coord_data):
-                if coords[0][0] == x[0][0]:
-                    before_coords = self.coord_data[i-1]
-                    break
-            break
-        ret_data = torch.reshape(before_coords, (1, before_coords.shape[0], before_coords.shape[1])) 
-        #get the rest
-        for i, x in enumerate(seq):
-            for j, coords in enumerate(self.coord_data):
-                if coords[0][0] == x[0][0]:
-                    coords_reshaped = torch.reshape(coords.clone(), (1, before_coords.shape[0], before_coords.shape[1]))                     
-                    ret_data = torch.cat((ret_data, coords_reshaped), 0)
-                    break
-        return ret_data
-    
-    
-    
+
+
+    def getCoordinates(self, time_stamp, ped_id):
+        for line in self.trajs_coords[ped_id]:
+            if line[0] == time_stamp and line[1] == ped_id:
+                ret_coord = (line[2],line[3])
+                return ret_coord
+        # print(f"{time_stamp, ped_id} no coord found")
+        return (0., 0.)
+
+
+    def gatherCoordinates(self):
+        file_data = deepcopy(self.source_file)
+        file_data = sorted(file_data, key=lambda data : data[1])
+        #now file_data is original file data with sorted by traj
+        trajs_coords = {}
+        traj_coords = []
+        temp_traj_idx = file_data[0][1]
+        for i, line in enumerate(file_data):
+            if line[1] != temp_traj_idx:
+                trajs_coords[temp_traj_idx] = traj_coords
+                temp_traj_idx = line[1]
+                traj_coords = []
+            else:
+                traj_coords.append(line)
+        return trajs_coords
+        
+
 # if __name__ == '__main__':
 #     D = FramesDataset("try_dataset111.txt")
 #     for i in range(len(D)):
@@ -365,9 +372,9 @@ def train(T_obs, T_pred, files, model=None, name="model.pt"):
 
     plot_data = {}
     for file in files:
-        plot_data[file] = [[] for _ in range(60)]
+        plot_data[file] = [[] for _ in range(500)]
 
-    EPOCH = 3
+    EPOCH = 5
     for epoch in range(EPOCH):
         print(f"epoch {epoch+1}/{EPOCH}  ")
 
@@ -380,7 +387,7 @@ def train(T_obs, T_pred, files, model=None, name="model.pt"):
                 h = torch.zeros(data['seq'].shape[1], h_dim, device=device)
                 c = torch.zeros(data['seq'].shape[1], h_dim, device=device)
 
-                print(f"batch {batch_idx+1}/{len(dataset) // batch_size} ", end='\r')
+                print(f"batch {batch_idx+1}/{len(dataset)} ", end='\r')
                 with torch.autograd.set_detect_anomaly(True):
                     Y = data['seq'][:T_pred][:T_pred,:,2:].clone()
                     input_seq = data['seq'][:T_pred].clone()
@@ -390,11 +397,12 @@ def train(T_obs, T_pred, files, model=None, name="model.pt"):
                     run_ratio = (T_obs+2)/T_pred
                     input_seq = trajPruningByAppear(part_masks, ratio=run_ratio, in_tensor=input_seq) 
                     Y = trajPruningByAppear(part_masks, ratio=run_ratio, in_tensor=Y)     
-                    # pr_masks = trajPruningByAppear(part_masks, ratio=run_ratio)         
-                    # (input_seq, Y, pr_masks) = trajPruningByStride(pr_masks, input_seq, (input_seq, Y, pr_masks))   
+                    pr_masks = trajPruningByAppear(part_masks, ratio=run_ratio)         
+                    (input_seq, Y, pr_masks) = trajPruningByStride(pr_masks, input_seq, (input_seq, Y, pr_masks))   
                     
                     #forward prop
-                    output = vl(input_seq, part_masks, h, c, Y, T_obs, T_pred)
+                    # output = vl(input_seq, part_masks, h, c, Y, T_obs, T_pred)
+                    output = vl(input_seq, pr_masks, h, c, Y, T_obs, T_pred)
 
                     #compute loss
                     Y_pred = output[T_obs+1:T_pred]
@@ -451,13 +459,10 @@ def train(T_obs, T_pred, files, model=None, name="model.pt"):
 def validate(model, T_obs, T_pred, file):
     #try to validate this
     h_dim = 128
-
     batch_size = T_pred
-
-#     dataset = FramesDataset("crowds_zara02.txt")
     dataset = FramesDataset(file)    
     
-    plotting_batches = np.arange(40)
+    plotting_batches = np.arange(20)
     plotting_data = []
     avgDispErrMeans = []
     finalDispErrMeans = []    
@@ -476,13 +481,13 @@ def validate(model, T_obs, T_pred, file):
             #dirty truncate
             run_ratio = (T_obs+2)/T_pred
             input_seq = trajPruningByAppear(part_masks, ratio=run_ratio, in_tensor=input_seq) 
-            # Y = trajPruningByAppear(part_masks, ratio=run_ratio, in_tensor=Y)     
-            # pr_masks = trajPruningByAppear(part_masks, ratio=run_ratio)
-            # (input_seq, Y, pr_masks) = trajPruningByStride(pr_masks, input_seq, (input_seq, Y, pr_masks))
+            Y = trajPruningByAppear(part_masks, ratio=run_ratio, in_tensor=Y)     
+            pr_masks = trajPruningByAppear(part_masks, ratio=run_ratio)
+            (input_seq, Y, pr_masks) = trajPruningByStride(pr_masks, input_seq, (input_seq, Y, pr_masks))
             
             #forward prop
-            # output = model(input_seq, pr_masks, h, c, Y, T_obs, T_pred)
-            output = model(input_seq, part_masks, h, c, Y, T_obs, T_pred)
+            # output = model(input_seq, part_masks, h, c, Y, T_obs, T_pred)
+            output = model(input_seq, pr_masks, h, c, Y, T_obs, T_pred)
 
             #compute cost
             Y_pred = output[T_obs+1:T_pred]
@@ -490,23 +495,24 @@ def validate(model, T_obs, T_pred, file):
             #......
 
             #get and process result                
-            Y_pred_param = Y_pred.clone()
-            coords_param = dataset.getCoordinates(data['seq']).clone()
+            # Y_pred_param = Y_pred.clone()
+            # coords_param = dataset.getCoordinates(data['seq']).clone()
 
             #save plotting data for visualization
             if batch_idx in plotting_batches:
-                plotting_data.append((Y_pred, part_masks, traj_num, batch_idx, dataset.getCoordinates(data['seq']), T_obs, True))
-                plotting_data.append((Y_pred_param, part_masks, traj_num, batch_idx, dataset.getCoordinates(data['seq']), T_obs, False))                    
+                # plotting_data.append((Y_pred, part_masks, traj_num, batch_idx, dataset.getCoordinates(data['seq']), T_obs, True))
+                plotting_data.append((Y_pred, input_seq, dataset, T_obs, False, batch_idx))                    
 
-            if batch_idx in range(len(dataset) // batch_size-1):
-                err = avgDispError(Y_pred_param, part_masks, traj_num, batch_idx, dataset.getCoordinates(data['seq']), T_obs)
+            if batch_idx in range(len(dataset)):
+                err = ADE(Y_pred, Y_g)
                 avgDispErrMeans.append(err)
 
-            if batch_idx in range(len(dataset) // batch_size-1):
-                err = finalDispError(Y_pred_param, part_masks, traj_num, batch_idx, dataset.getCoordinates(data['seq']), T_obs)
-                finalDispErrMeans.append(err)                
+            if batch_idx in range(len(dataset)):
+                err = FDE(Y_pred, Y_g)
+                finalDispErrMeans.append(err)            
         
-    for d in plotting_data:
+    for i, d in enumerate(plotting_data):
+        print(f"plotting {i}th pic")
         plotting_batch(*d)
         
     print("total avg disp mean ", np.sum(np.array(avgDispErrMeans))/len([v for v in avgDispErrMeans if v != 0]))
@@ -514,49 +520,53 @@ def validate(model, T_obs, T_pred, file):
 
 
 # %%
-'''
-@param trajs~(frame_num of a batch x traj_num x 2)
-'''
-def plotting_batch(batch_trajs_pred_gpu, part_masks, traj_num, batch_idx, coord_data, T_obs, is_total):          
+def plotting_batch(batch_trajs_pred_gpu, input_seq, dataset, T_obs, is_total, batch_idx):          
     #reform the trajs tensor to a list of each traj's pos at each frame
     batch_trajs_pred = batch_trajs_pred_gpu.cpu().data.numpy()
-    trajs_pred_list = [np.array([]) for _ in range(traj_num)]
-    parts = []
-    for frame_idx, trajs_pred in enumerate(batch_trajs_pred):
-        for traj_idx, pos_pred in enumerate(trajs_pred):
-            if not (pos_pred == np.array([0., 0.])).all():
-                if traj_idx not in parts:
-                    parts.append(traj_idx)
-                    trajs_pred_list[int(traj_idx)] = np.array(pos_pred)  
-                else:
-                    trajs_pred_list[int(traj_idx)] = np.vstack((trajs_pred_list[int(traj_idx)], pos_pred))
-            
-    #calc the coords of each step for plotting
-    batch_coords = coord_data.cpu().data.numpy()
-    split_points = np.array(batch_coords[T_obs+1,:,2:])    
-    trajs_pred_coords = []
+    trajs_pred_list = [[] for _ in range(batch_trajs_pred.shape[1])]
+    part = []
+    for traj_idx in range(batch_trajs_pred.shape[1]):
+        if np.sum(batch_trajs_pred[:,traj_idx,:]) == 0.:
+            continue
+        trajs_pred_list[traj_idx] = batch_trajs_pred[:,traj_idx,:]    
+        part.append(traj_idx)
+
+    trajs_coord_list = [[] for _ in range(batch_trajs_pred.shape[1])]
+    for traj_idx in part:
+        for t in range(input_seq.shape[0]):
+            if (input_seq[t,traj_idx,2:] == torch.tensor([0.,0.],device=device)).all():
+                trajs_coord_list[traj_idx].append((0.,0.))   
+                continue  
+            trajs_coord_list[traj_idx].append(dataset.getCoordinates(input_seq[t,traj_idx,0].item(),input_seq[t,traj_idx,1].item()))
+        trajs_coord_list[traj_idx].append(dataset.getCoordinates(input_seq[t,traj_idx,0].item()+dataset.time_step,input_seq[t,traj_idx,1].item()))
+    
+    #calc the coords of each step
+    trajs_pred_coords = np.zeros((len(trajs_pred_list), input_seq.shape[0]-T_obs, 2))
     for traj_idx, traj in enumerate(trajs_pred_list):
-        traj_pred_coord = np.array(split_points[traj_idx])
-        temp_point = np.array(split_points[traj_idx])
-        for off in traj:
-            next_point = temp_point + off
-            traj_pred_coord = np.vstack((traj_pred_coord, next_point))
-            temp_point = next_point
-        trajs_pred_coords.append(traj_pred_coord)
+        if traj_idx not in part:
+            continue
+        split_point = np.array(trajs_coord_list[traj_idx][T_obs+1])
+
+        trajs_pred_coords[traj_idx,0] += np.array(split_point)
+        next_point = split_point
+        for i, off in enumerate(traj):
+            next_point += np.array(off)
+            trajs_pred_coords[traj_idx,i+1] = next_point
+    # trajs_pred_coords = np.array(trajs_pred_coords)
         
     #plot
-    plt.figure(figsize=(12,12))
-    plt.xlim([-2,15])
-    plt.ylim([-2,15])
+    plt.figure(figsize=(30,30))
+    plt.xlim([-15,15])
+    plt.ylim([-15,15])
     plot_idx = 0
-    for traj_idx in parts:
+    for traj_idx in part:
         try:
             pred_x = trajs_pred_coords[traj_idx][:,0]
         except IndexError:
             print("not enough appearance")
             continue
         pred_y = trajs_pred_coords[traj_idx][:,1]            
-        plt.plot(pred_x, pred_y, label="pred"+str(traj_idx))
+        plt.plot(pred_x, pred_y, label="pred"+str(traj_idx), marker='.')
         for i, (x, y) in enumerate(zip(pred_x, pred_y)):
             if i < len(pred_x)-1:
                 try:
@@ -564,12 +574,13 @@ def plotting_batch(batch_trajs_pred_gpu, part_masks, traj_num, batch_idx, coord_
                 except IndexError:
                     print("plot error")
 
-        total_x = batch_coords[:,traj_idx,2]        
+        trajs_coord = np.array(trajs_coord_list[traj_idx])
+        total_x = trajs_coord[:,0]    
         total_x = total_x[np.where(total_x != 0.)]
-        total_y = batch_coords[:,traj_idx,3]
+        total_y = trajs_coord[:,1]
         total_y = total_y[np.where(total_y != 0.)]       
         try:
-            plt.plot(total_x, total_y, linestyle="dashed", label="total"+str(traj_idx))
+            plt.plot(total_x, total_y, linestyle="dashed", label="total"+str(traj_idx), marker='1')
         except ValueError:
             print("plot error")
             
@@ -583,100 +594,113 @@ def plotting_batch(batch_trajs_pred_gpu, part_masks, traj_num, batch_idx, coord_
  
     plt.legend(loc="upper right")
     plt.title(f"batch {batch_idx}")
-    plt.savefig("eth_plots/"+str(batch_idx)+str(is_total)+"6-6-20-all")
-    
-    
-def avgDispError(batch_trajs_pred_gpu, part_masks, traj_num, batch_idx, coord_data, T_obs):
-    #reform the trajs tensor to a list of each traj's pos at each frame
-    batch_trajs_pred = batch_trajs_pred_gpu.cpu().data.numpy()
-    trajs_pred_list = [np.array([]) for _ in range(traj_num)]
-    parts = []
-    for frame_idx, trajs_pred in enumerate(batch_trajs_pred):
-        for traj_idx, pos_pred in enumerate(trajs_pred):
-            if not (pos_pred == np.array([0., 0.])).all():
-                if traj_idx not in parts:
-                    parts.append(traj_idx)
-                    trajs_pred_list[int(traj_idx)] = np.array(pos_pred)  
-                else:
-                    trajs_pred_list[int(traj_idx)] = np.vstack((trajs_pred_list[int(traj_idx)], pos_pred))
+    plt.savefig("eth_plots/"+str(batch_idx)+str(is_total)+"6-6-20-all")    
+
+
+
+
+
+# '''
+# @param trajs~(frame_num of a batch x traj_num x 2)
+# '''
+# def plotting_batch(batch_trajs_pred_gpu, part_masks, traj_num, batch_idx, coord_data, T_obs, is_total):          
+#     #reform the trajs tensor to a list of each traj's pos at each frame
+#     batch_trajs_pred = batch_trajs_pred_gpu.cpu().data.numpy()
+#     trajs_pred_list = [np.array([]) for _ in range(traj_num)]
+#     parts = []
+#     for frame_idx, trajs_pred in enumerate(batch_trajs_pred):
+#         for traj_idx, pos_pred in enumerate(trajs_pred):
+#             if not (pos_pred == np.array([0., 0.])).all():
+#                 if traj_idx not in parts:
+#                     parts.append(traj_idx)
+#                     trajs_pred_list[int(traj_idx)] = np.array(pos_pred)  
+#                 else:
+#                     trajs_pred_list[int(traj_idx)] = np.vstack((trajs_pred_list[int(traj_idx)], pos_pred))
             
-    #calc the coords of each step
-    batch_coords = coord_data.cpu().data.numpy()
-    split_points = np.array(batch_coords[T_obs+1,:,2:])    
-    trajs_pred_coords = []
-    for traj_idx, traj in enumerate(trajs_pred_list):
-        traj_pred_coord = np.array(split_points[traj_idx])
-        temp_point = np.array(split_points[traj_idx])
-        for off in traj:
-            next_point = temp_point + off
-            traj_pred_coord = np.vstack((traj_pred_coord, next_point))
-            temp_point = next_point
-        trajs_pred_coords.append(traj_pred_coord)   
+#     #calc the coords of each step for plotting
+#     batch_coords = coord_data.cpu().data.numpy()
+#     split_points = np.array(batch_coords[T_obs+1,:,2:])    
+#     trajs_pred_coords = []
+#     for traj_idx, traj in enumerate(trajs_pred_list):
+#         traj_pred_coord = np.array(split_points[traj_idx])
+#         temp_point = np.array(split_points[traj_idx])
+#         for off in traj:
+#             next_point = temp_point + off
+#             traj_pred_coord = np.vstack((traj_pred_coord, next_point))
+#             temp_point = next_point
+#         trajs_pred_coords.append(traj_pred_coord)
         
-    #compare
-    trajs_dist = []
-    step_num = 0
-    for traj_idx, traj in enumerate(parts):
-        T_valid = T_obs+1+trajs_pred_coords[traj].shape[0]
-        diff = batch_coords[T_obs+1:T_valid,traj,2:] - trajs_pred_coords[traj]
-        traj_dist = np.sum(np.linalg.norm(diff, axis=1))        
-        if not math.isnan(traj_dist):
-            trajs_dist.append(traj_dist)
-            step_num += diff.shape[0]
+#     #plot
+#     plt.figure(figsize=(30,30))
+#     plt.xlim([-15,15])
+#     plt.ylim([-15,15])
+#     plot_idx = 0
+#     for traj_idx in parts:
+#         try:
+#             pred_x = trajs_pred_coords[traj_idx][:,0]
+#         except IndexError:
+#             print("not enough appearance")
+#             continue
+#         pred_y = trajs_pred_coords[traj_idx][:,1]            
+#         plt.plot(pred_x, pred_y, label="pred"+str(traj_idx), marker='.')
+#         for i, (x, y) in enumerate(zip(pred_x, pred_y)):
+#             if i < len(pred_x)-1:
+#                 try:
+#                     plt.arrow(x, y, (pred_x[i+1] - x)/2, (pred_y[i+1] - y)/2, width=0.0001, head_width=0.001, head_length=0.001)    
+#                 except IndexError:
+#                     print("plot error")
 
-    if len(trajs_dist) != 0:
-        mean_of_trajs_mean = np.sum(np.array(trajs_dist))/step_num
-    else:
-        mean_of_trajs_mean = 0
- 
-    print(f"avgDispError {mean_of_trajs_mean}")
-    return mean_of_trajs_mean
-
-
-def finalDispError(batch_trajs_pred_gpu, part_masks, traj_num, batch_idx, coord_data, T_obs):
-    #reform the trajs tensor to a list of each traj's pos at each frame
-    batch_trajs_pred = batch_trajs_pred_gpu.cpu().data.numpy()
-    trajs_pred_list = [np.array([]) for _ in range(traj_num)]
-    parts = []
-    for frame_idx, trajs_pred in enumerate(batch_trajs_pred):
-        for traj_idx, pos_pred in enumerate(trajs_pred):
-            if not (pos_pred == np.array([0., 0.])).all():
-                if traj_idx not in parts:
-                    parts.append(traj_idx)
-                    trajs_pred_list[int(traj_idx)] = np.array(pos_pred)  
-                else:
-                    trajs_pred_list[int(traj_idx)] = np.vstack((trajs_pred_list[int(traj_idx)], pos_pred))
+#         total_x = batch_coords[:,traj_idx,2]        
+#         total_x = total_x[np.where(total_x != 0.)]
+#         total_y = batch_coords[:,traj_idx,3]
+#         total_y = total_y[np.where(total_y != 0.)]       
+#         try:
+#             plt.plot(total_x, total_y, linestyle="dashed", label="total"+str(traj_idx), marker='1')
+#         except ValueError:
+#             print("plot error")
             
-    #calc the coords of each step
-    batch_coords = coord_data.cpu().data.numpy()
-    split_points = np.array(batch_coords[T_obs+1,:,2:])    
-    trajs_pred_coords = []
-    for traj_idx, traj in enumerate(trajs_pred_list):
-        traj_pred_coord = np.array(split_points[traj_idx])
-        temp_point = np.array(split_points[traj_idx])
-        for off in traj:
-            next_point = temp_point + off
-            traj_pred_coord = np.vstack((traj_pred_coord, next_point))
-            temp_point = next_point
-        trajs_pred_coords.append(traj_pred_coord)   
-    
-    #compare
-    trajs_dist = []
-    for traj_idx, traj in enumerate(parts):
-        T_valid = T_obs+1+trajs_pred_coords[traj].shape[0]
-        diff = batch_coords[T_obs+1:T_valid,traj,2:] - trajs_pred_coords[traj]
-        final_diff = diff[-1]
-        traj_dist = np.linalg.norm(final_diff)       
-        if not math.isnan(traj_dist):
-            trajs_dist.append(traj_dist)
-
-    if len(trajs_dist) != 0:
-        mean_of_trajs_final = np.mean(np.array(trajs_dist))
-    else:
-        mean_of_trajs_final = 0
+#         for i, (x, y) in enumerate(zip(total_x, total_y)):
+#             if i < len(total_x)-1:
+#                 try:
+#                     plt.arrow(x, y, (total_x[i+1] - x)/2, (total_y[i+1] - y)/2, width=0.0001, head_width=0.001, head_length=0.001)
+#                 except IndexError:
+#                     print("plot error")
+#         plot_idx += 1
  
-    print(f"finalDispError {mean_of_trajs_final}")
-    return mean_of_trajs_final
+#     plt.legend(loc="upper right")
+#     plt.title(f"batch {batch_idx}")
+#     plt.savefig("eth_plots/"+str(batch_idx)+str(is_total)+"6-6-20-all")
+
+
+def ADE(X, Y):
+    result = 0.
+    for traj_idx in range(X.shape[1]):
+        dist = 0.
+        pos_X, pos_Y = torch.tensor([0.,0.], device=device), torch.tensor([0.,0.], device=device)
+        for t in range(X.shape[0]):
+            pos_X += X[t,traj_idx]
+            pos_Y += Y[t,traj_idx]
+            dist += torch.dist(pos_Y, pos_X)
+        dist /= X.shape[0]
+        result += dist
+    result /= X.shape[1]
+    print(f"avg disp error {result}")
+    return result    
+
+
+def FDE(X, Y):
+    result = 0.
+    for traj_idx in range(X.shape[1]):
+        dist = 0.
+        pos_X, pos_Y = torch.tensor([0.,0.], device=device), torch.tensor([0.,0.], device=device)
+        for t in range(X.shape[0]):
+            pos_X += X[t,traj_idx]
+            pos_Y += Y[t,traj_idx]
+        dist += torch.dist(pos_Y, pos_X)
+        result += dist
+    result /= X.shape[1]
+    print(f"final disp error {result}")
+    return result        
 
 
 # %%
@@ -726,24 +750,23 @@ if __name__ == "__main__":
             
 #         print("====================================")
 
-    # files_dir = "datasets/eth/train"
-    # name = "eth_vl.pt"
-    # print(f"pulling from dir {files_dir}")
-    # files = [join(files_dir, f) for f in listdir(files_dir) if isfile(join(files_dir, f))]
-    # vl = torch.load("eth_vl.pt")
-    # #training
-    # vl = train(8, 20, files, name=name, model=vl)
+    files_dir = "datasets/eth/train"
+    name = "eth_vl.pt"
+    print(f"pulling from dir {files_dir}")
+    files = [join(files_dir, f) for f in listdir(files_dir) if isfile(join(files_dir, f))]
+    #training
+    vl = train(8, 20, files, name=name)
 
-    # torch.cuda.empty_cache()
-    # vl1 = torch.load("eth_vl.pt")
-    # print(f"loading from eth_vl.pt")
-    # #preparing validating set
-    # files_dir = "datasets/eth/test"
-    # print(f"pulling from dir {files_dir}")        
-    # files = [join(files_dir, f) for f in listdir(files_dir) if isfile(join(files_dir, f))]
-    # #validating
-    # for file in files:
-    #     validate(vl1, 8, 20, file) 
+    torch.cuda.empty_cache()
+    vl1 = torch.load("eth_vl.pt")
+    print(f"loading from eth_vl.pt")
+    #preparing validating set
+    files_dir = "datasets/eth/test"
+    print(f"pulling from dir {files_dir}")        
+    files = [join(files_dir, f) for f in listdir(files_dir) if isfile(join(files_dir, f))]
+    #validating
+    for file in files:
+        validate(vl1, 8, 20, file) 
 
 
     # temp = train(8, 20, ["datasets/hotel/test/biwi_hotel.txt"])
@@ -752,6 +775,6 @@ if __name__ == "__main__":
     # validate(temp, 8, 20, "datasets/hotel/test/biwi_hotel.txt")
     # validate(temp, 8, 20, "datasets/eth/test/biwi_eth.txt")
 
-    temp = train(8, 20, ["try_dataset.txt"])
-    # temp = torch.load("model.pt")
-    validate(temp, 8, 20, "try_dataset.txt")
+    # temp = train(8, 20, ["datasets/eth/test/biwi_eth.txt"])
+    # # temp = torch.load("model.pt")
+    # validate(temp, 8, 20, "try_dataset.txt")
