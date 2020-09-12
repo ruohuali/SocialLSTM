@@ -342,7 +342,7 @@ def trajPruningByAppear(part_mask, ratio=0.6, in_tensor=None):
 '''@note last elem in in_tensors must be the mask'''
 def trajPruningByStride(part_mask, ref_tensor, in_tensors, length=0.3):
     for traj in range(ref_tensor.shape[1]):
-        actual_strides = ref_tensor[:,traj,2:]
+        actual_strides = ref_tensor[:,traj,:]
         avg_stride_len = torch.mean(torch.abs(actual_strides[actual_strides!=torch.zeros(2, device=device)]))
         #if divide by zero means the traj never appears in the batch
         if math.isnan(avg_stride_len):
@@ -412,15 +412,15 @@ def train(T_obs, T_pred, files, model=None, name="model.pt"):
                     part_masks = data['mask']
 
                     #dirty truncate
-                    run_ratio = (T_obs+2)/T_pred
-                    input_seq = trajPruningByAppear(part_masks, ratio=run_ratio, in_tensor=input_seq) 
-                    Y = trajPruningByAppear(part_masks, ratio=run_ratio, in_tensor=Y)     
-                    pr_masks = trajPruningByAppear(part_masks, ratio=run_ratio)         
-                    (input_seq, Y, pr_masks) = trajPruningByStride(pr_masks, input_seq, (input_seq, Y, pr_masks))   
+                    #run_ratio = (T_obs+2)/T_pred
+                    #input_seq = trajPruningByAppear(part_masks, ratio=run_ratio, in_tensor=input_seq) 
+                    #Y = trajPruningByAppear(part_masks, ratio=run_ratio, in_tensor=Y)     
+                    #pr_masks = trajPruningByAppear(part_masks, ratio=run_ratio)         
+                    #(input_seq, Y, pr_masks) = trajPruningByStride(pr_masks, input_seq, (input_seq, Y, pr_masks))   
                     
                     #forward prop
-                    # output = vl(input_seq, part_masks, h, c, Y, T_obs, T_pred)
-                    output = vl(input_seq, pr_masks, h, c, Y, T_obs, T_pred)
+                    output = vl(input_seq, part_masks, h, c, Y, T_obs, T_pred)
+                    #output = vl(input_seq, pr_masks, h, c, Y, T_obs, T_pred)
 
                     #compute loss
                     Y_pred = output[T_obs+1:T_pred]
@@ -496,11 +496,11 @@ def validate(model, T_obs, T_pred, file):
         with torch.no_grad():         
             print(f"batch {batch_idx+1}/{len(dataset)}  ", end='\r')
             #dirty truncate
-            # run_ratio = (T_obs+2)/T_pred
-            # input_seq = trajPruningByAppear(part_masks, ratio=run_ratio, in_tensor=input_seq) 
-            # Y = trajPruningByAppear(part_masks, ratio=run_ratio, in_tensor=Y)     
-            # pr_masks = trajPruningByAppear(part_masks, ratio=run_ratio)
-            # (input_seq, Y, pr_masks) = trajPruningByStride(pr_masks, input_seq, (input_seq, Y, pr_masks))
+            #run_ratio = (T_obs+2)/T_pred
+            #input_seq = trajPruningByAppear(part_masks, ratio=run_ratio, in_tensor=input_seq) 
+            #Y = trajPruningByAppear(part_masks, ratio=run_ratio, in_tensor=Y)     
+            #pr_masks = trajPruningByAppear(part_masks, ratio=run_ratio)
+            #(input_seq, Y, pr_masks) = trajPruningByStride(part_masks, input_seq, (input_seq, Y, part_masks))
             
             #forward prop
             output = model(input_seq, part_masks, h, c, Y, T_obs, T_pred)
@@ -540,6 +540,8 @@ def validate(model, T_obs, T_pred, file):
 def ADE(X, Y):
     result = 0.
     for traj_idx in range(X.shape[1]):
+        if traj_idx % 100 == 99:
+            print("gone",traj_idx)
         dist = 0.
         pos_X, pos_Y = torch.tensor([0.,0.], device=device), torch.tensor([0.,0.], device=device)
         for t in range(X.shape[0]):
@@ -556,6 +558,8 @@ def ADE(X, Y):
 def FDE(X, Y):
     result = 0.
     for traj_idx in range(X.shape[1]):
+        if traj_idx % 100 == 99:
+            print("goiung",traj_idx)
         dist = 0.
         pos_X, pos_Y = torch.tensor([0.,0.], device=device), torch.tensor([0.,0.], device=device)
         for t in range(X.shape[0]):
@@ -696,15 +700,15 @@ if __name__ == "__main__":
             
 # #         print("====================================")
 
-#     # files_dir = "datasets/eth/train"
-#     # name = "eth_vl.pt"
-#     # print(f"pulling from dir {files_dir}")
-#     # files = [join(files_dir, f) for f in listdir(files_dir) if isfile(join(files_dir, f))]
-#     # #training
-#     # vl = train(8, 20, files, name=name)
+    #files_dir = "datasets/eth/train"
+    #name = "eth_vl.pt"
+    #print(f"pulling from dir {files_dir}")
+    #files = [join(files_dir, f) for f in listdir(files_dir) if isfile(join(files_dir, f))]
+    #training
+    #vl = train(8, 20, files, name=name)
 
 #     # torch.cuda.empty_cache()
-#     vl1 = torch.load("eth_vl.pt")
+    vl1 = torch.load("eth_vl.pt")
 #     print(f"loading from eth_vl.pt")
 #     #preparing validating set
 #     files_dir = "datasets/eth/test"
@@ -721,6 +725,6 @@ if __name__ == "__main__":
 #     # validate(temp, 8, 20, "datasets/hotel/test/biwi_hotel.txt")
 #     # validate(temp, 8, 20, "datasets/eth/test/biwi_eth.txt")
 
-    # temp = train(8, 20, ["datasets/eth/test/biwi_eth.txt"])
-    temp = torch.load("eth_vl.pt")
-    validate(temp, 20, 40, "x_all.p")
+    #temp = train(8, 20, ["datasets/eth/test/biwi_eth.txt"])
+    #temp = torch.load("eth_vl.pt")
+    validate(vl1, 20, 40, "x_all.p")
