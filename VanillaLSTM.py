@@ -14,6 +14,7 @@ from os.path import isfile, join
 import warnings
 warnings.filterwarnings("ignore", category=RuntimeWarning)
 from copy import deepcopy 
+import pickle
 
 
 # %%
@@ -165,16 +166,35 @@ class FramesDataset(Dataset):
     def backCompatible(self, path):
         file_data = deepcopy(self.source_file)
         self.traj_list, self.participant_masks, self.off_data, self.coord_data = self.preprocessBatch(file_data)
-            
 
-    def __init__(self, path, length=20, ratio=0.9):
+
+    def dealWithSpecial(self, file):
+        with open("x_all.p", 'rb') as f:
+            ft = pickle.load(f)
+        #file data tensor ~ (40x86318x2)
+        #get offsets
+        off_data = torch.zeros(ft.shape[0]-1,ft.shape[1],ft.shape[2])
+        for t in range(ft.shape[0]-1):
+            off_data[t] = ft[t+1] - ft[t]
+        coord_data = deepcopy(ft)
+        participant_masks = torch.ones(ft.shape[0], 1, ft.shape[1])
+        data_packet = { "mask":participant_masks,
+                        "seq":off_data,
+                        "coord":coord_data }
+        self.data_packets = [data_packet]
+
+
+    def __init__(self, path, length=20, ratio=0.9, special=False):
         global device
         device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-        self.source_file = self.storeFile(path)
-        self.data_packets = []
-        self.preprocess(length, ratio)
-        self.backCompatible(path)
-        self.trajs_coords = self.gatherCoordinates()
+        if not special:
+            self.source_file = self.storeFile(path)
+            self.data_packets = []
+            self.preprocess(length, ratio)
+            self.backCompatible(path)
+            self.trajs_coords = self.gatherCoordinates()
+        else:
+            self.dealWithSpecial(path)
 
 
     def __len__(self):
@@ -226,7 +246,8 @@ class FramesDataset(Dataset):
         
 
 # if __name__ == '__main__':
-#     D = FramesDataset("try_dataset111.txt")
+#     D = FramesDataset("x_all.p", special=True)
+#     pdb.set_trace()
 #     for i in range(len(D)):
 #         data_packet = D[i]
 #         pdb.set_trace()
@@ -278,7 +299,7 @@ class VanillaLSTM(nn.Module):
                 continue
                 
             elif frame_idx <= T_obs:
-                r = self.Phi(self.InputLayer(x[:,2:]))
+                r = self.Phi(self.InputLayer(x))
                 # r = self.LinearNet(x[:,2:])
                 all_h_t, all_c_t = self.LSTMCell(r, (all_h_t, all_c_t))
                 part_mask = torch.t(part_masks[frame_idx]).expand(part_masks[frame_idx].shape[1], self.output_dim)
@@ -356,7 +377,6 @@ def train(T_obs, T_pred, files, model=None, name="model.pt"):
     print(f"totally training on {files}")    
     #params
     h_dim = 128
-    batch_size = T_pred
 
     if model == None:
         print("instantiating model")
@@ -390,7 +410,7 @@ def train(T_obs, T_pred, files, model=None, name="model.pt"):
                 print(f"batch {batch_idx+1}/{len(dataset)} ", end='\r')
                 with torch.autograd.set_detect_anomaly(True):
                     Y = data['seq'][:T_pred][:T_pred,:,2:].clone()
-                    input_seq = data['seq'][:T_pred].clone()
+                    input_seq = data['seq'][:T_pred,:,2:].clone()
                     part_masks = data['mask']
 
                     #dirty truncate
@@ -459,8 +479,7 @@ def train(T_obs, T_pred, files, model=None, name="model.pt"):
 def validate(model, T_obs, T_pred, file):
     #try to validate this
     h_dim = 128
-    batch_size = T_pred
-    dataset = FramesDataset(file)    
+    dataset = FramesDataset(file, special=True)    
     
     plotting_batches = np.arange(20)
     plotting_data = []
@@ -473,21 +492,21 @@ def validate(model, T_obs, T_pred, file):
         h = torch.zeros(data['seq'].shape[1], h_dim, device=device)
         c = torch.zeros(data['seq'].shape[1], h_dim, device=device)
 
-        Y = data['seq'][:T_pred,:,2:].clone()
-        input_seq = data['seq'][:T_pred].clone()
+        Y = data['seq'][:T_pred,:].clone()
+        input_seq = data['seq'][:T_pred,:].clone()
         part_masks = data['mask']            
         with torch.no_grad():         
             print(f"batch {batch_idx+1}/{len(dataset)}  ", end='\r')
             #dirty truncate
-            run_ratio = (T_obs+2)/T_pred
-            input_seq = trajPruningByAppear(part_masks, ratio=run_ratio, in_tensor=input_seq) 
-            Y = trajPruningByAppear(part_masks, ratio=run_ratio, in_tensor=Y)     
-            pr_masks = trajPruningByAppear(part_masks, ratio=run_ratio)
-            (input_seq, Y, pr_masks) = trajPruningByStride(pr_masks, input_seq, (input_seq, Y, pr_masks))
+            # run_ratio = (T_obs+2)/T_pred
+            # input_seq = trajPruningByAppear(part_masks, ratio=run_ratio, in_tensor=input_seq) 
+            # Y = trajPruningByAppear(part_masks, ratio=run_ratio, in_tensor=Y)     
+            # pr_masks = trajPruningByAppear(part_masks, ratio=run_ratio)
+            # (input_seq, Y, pr_masks) = trajPruningByStride(pr_masks, input_seq, (input_seq, Y, pr_masks))
             
             #forward prop
-            # output = model(input_seq, part_masks, h, c, Y, T_obs, T_pred)
-            output = model(input_seq, pr_masks, h, c, Y, T_obs, T_pred)
+            output = model(input_seq, part_masks, h, c, Y, T_obs, T_pred)
+            # output = model(input_seq, pr_masks, h, c, Y, T_obs, T_pred)
 
             #compute cost
             Y_pred = output[T_obs+1:T_pred]
@@ -501,7 +520,7 @@ def validate(model, T_obs, T_pred, file):
             #save plotting data for visualization
             if batch_idx in plotting_batches:
                 # plotting_data.append((Y_pred, part_masks, traj_num, batch_idx, dataset.getCoordinates(data['seq']), T_obs, True))
-                plotting_data.append((Y_pred, input_seq, dataset, T_obs, False, batch_idx))                    
+                plotting_data.append((Y_pred, data['seq'][:T_pred].clone(), dataset, T_obs, False, batch_idx))                    
 
             if batch_idx in range(len(dataset)):
                 err = ADE(Y_pred, Y_g)
@@ -511,9 +530,9 @@ def validate(model, T_obs, T_pred, file):
                 err = FDE(Y_pred, Y_g)
                 finalDispErrMeans.append(err)            
         
-    for i, d in enumerate(plotting_data):
-        print(f"plotting {i}th pic")
-        plotting_batch(*d)
+    # for i, d in enumerate(plotting_data):
+    #     print(f"plotting {i}th pic")
+    #     plotting_batch(*d)
         
     print("total avg disp mean ", np.sum(np.array(avgDispErrMeans))/len([v for v in avgDispErrMeans if v != 0]))
     print("total final disp mean ", np.sum(np.array(finalDispErrMeans))/len([v for v in finalDispErrMeans if v != 0]))    
@@ -597,81 +616,6 @@ def plotting_batch(batch_trajs_pred_gpu, input_seq, dataset, T_obs, is_total, ba
     plt.savefig("eth_plots/"+str(batch_idx)+str(is_total)+"6-6-20-all")    
 
 
-
-
-
-# '''
-# @param trajs~(frame_num of a batch x traj_num x 2)
-# '''
-# def plotting_batch(batch_trajs_pred_gpu, part_masks, traj_num, batch_idx, coord_data, T_obs, is_total):          
-#     #reform the trajs tensor to a list of each traj's pos at each frame
-#     batch_trajs_pred = batch_trajs_pred_gpu.cpu().data.numpy()
-#     trajs_pred_list = [np.array([]) for _ in range(traj_num)]
-#     parts = []
-#     for frame_idx, trajs_pred in enumerate(batch_trajs_pred):
-#         for traj_idx, pos_pred in enumerate(trajs_pred):
-#             if not (pos_pred == np.array([0., 0.])).all():
-#                 if traj_idx not in parts:
-#                     parts.append(traj_idx)
-#                     trajs_pred_list[int(traj_idx)] = np.array(pos_pred)  
-#                 else:
-#                     trajs_pred_list[int(traj_idx)] = np.vstack((trajs_pred_list[int(traj_idx)], pos_pred))
-            
-#     #calc the coords of each step for plotting
-#     batch_coords = coord_data.cpu().data.numpy()
-#     split_points = np.array(batch_coords[T_obs+1,:,2:])    
-#     trajs_pred_coords = []
-#     for traj_idx, traj in enumerate(trajs_pred_list):
-#         traj_pred_coord = np.array(split_points[traj_idx])
-#         temp_point = np.array(split_points[traj_idx])
-#         for off in traj:
-#             next_point = temp_point + off
-#             traj_pred_coord = np.vstack((traj_pred_coord, next_point))
-#             temp_point = next_point
-#         trajs_pred_coords.append(traj_pred_coord)
-        
-#     #plot
-#     plt.figure(figsize=(30,30))
-#     plt.xlim([-15,15])
-#     plt.ylim([-15,15])
-#     plot_idx = 0
-#     for traj_idx in parts:
-#         try:
-#             pred_x = trajs_pred_coords[traj_idx][:,0]
-#         except IndexError:
-#             print("not enough appearance")
-#             continue
-#         pred_y = trajs_pred_coords[traj_idx][:,1]            
-#         plt.plot(pred_x, pred_y, label="pred"+str(traj_idx), marker='.')
-#         for i, (x, y) in enumerate(zip(pred_x, pred_y)):
-#             if i < len(pred_x)-1:
-#                 try:
-#                     plt.arrow(x, y, (pred_x[i+1] - x)/2, (pred_y[i+1] - y)/2, width=0.0001, head_width=0.001, head_length=0.001)    
-#                 except IndexError:
-#                     print("plot error")
-
-#         total_x = batch_coords[:,traj_idx,2]        
-#         total_x = total_x[np.where(total_x != 0.)]
-#         total_y = batch_coords[:,traj_idx,3]
-#         total_y = total_y[np.where(total_y != 0.)]       
-#         try:
-#             plt.plot(total_x, total_y, linestyle="dashed", label="total"+str(traj_idx), marker='1')
-#         except ValueError:
-#             print("plot error")
-            
-#         for i, (x, y) in enumerate(zip(total_x, total_y)):
-#             if i < len(total_x)-1:
-#                 try:
-#                     plt.arrow(x, y, (total_x[i+1] - x)/2, (total_y[i+1] - y)/2, width=0.0001, head_width=0.001, head_length=0.001)
-#                 except IndexError:
-#                     print("plot error")
-#         plot_idx += 1
- 
-#     plt.legend(loc="upper right")
-#     plt.title(f"batch {batch_idx}")
-#     plt.savefig("eth_plots/"+str(batch_idx)+str(is_total)+"6-6-20-all")
-
-
 def ADE(X, Y):
     result = 0.
     for traj_idx in range(X.shape[1]):
@@ -708,73 +652,73 @@ if __name__ == "__main__":
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     print(f"device {device}\n")
 
-    # train_datasets = ["datasets/eth/train",
-    #                   "datasets/hotel/train",               
-    #                   "datasets/univ/train",
-    #                   "datasets/zara1/train",
-    #                   "datasets/zara2/train"
-    #                  ]
-    # val_datasets = ["datasets/eth/test",
-    #                 "datasets/hotel/test",               
-    #                 "datasets/univ/test",
-    #                 "datasets/zara1/test",
-    #                 "datasets/zara2/test"
-    #                 ]
-    # names = ["eth_vl.pt",
-    #          "hotel_vl.pt",
-    #          "univ_vl.pt",
-    #          "zara1_vl.pt",
-    #          "zara2_vl.pt"
-    #         ]
+#     # train_datasets = ["datasets/eth/train",
+#     #                   "datasets/hotel/train",               
+#     #                   "datasets/univ/train",
+#     #                   "datasets/zara1/train",
+#     #                   "datasets/zara2/train"
+#     #                  ]
+#     # val_datasets = ["datasets/eth/test",
+#     #                 "datasets/hotel/test",               
+#     #                 "datasets/univ/test",
+#     #                 "datasets/zara1/test",
+#     #                 "datasets/zara2/test"
+#     #                 ]
+#     # names = ["eth_vl.pt",
+#     #          "hotel_vl.pt",
+#     #          "univ_vl.pt",
+#     #          "zara1_vl.pt",
+#     #          "zara2_vl.pt"
+#     #         ]
     
-    # for train_dataset, val_dataset, name in zip(train_datasets, val_datasets, names):
-    #     #preparing training set
-    #     files_dir = train_dataset
-    #     print(f"pulling from dir {files_dir}")
-    #     files = [join(files_dir, f) for f in listdir(files_dir) if isfile(join(files_dir, f))]
-    #     vl = None
-    #     #training
-    #     for file in files:
-    #         vl = train(8, 20, file, model=vl, name=name)
+#     # for train_dataset, val_dataset, name in zip(train_datasets, val_datasets, names):
+#     #     #preparing training set
+#     #     files_dir = train_dataset
+#     #     print(f"pulling from dir {files_dir}")
+#     #     files = [join(files_dir, f) for f in listdir(files_dir) if isfile(join(files_dir, f))]
+#     #     vl = None
+#     #     #training
+#     #     for file in files:
+#     #         vl = train(8, 20, file, model=vl, name=name)
 
-#         vl1 = torch.load(name)
-#         print(f"loading from {name}")
-#     #     validate(vl1, 8, 20, "try_dataset.txt")       
-#         #preparing validating set
-#         files_dir = val_dataset
-#         print(f"pulling from dir {files_dir}")        
-#         files = [join(files_dir, f) for f in listdir(files_dir) if isfile(join(files_dir, f))]
-#         #validating
-#         for file in files:
-#             validate(vl1, 8, 20, file)   
+# #         vl1 = torch.load(name)
+# #         print(f"loading from {name}")
+# #     #     validate(vl1, 8, 20, "try_dataset.txt")       
+# #         #preparing validating set
+# #         files_dir = val_dataset
+# #         print(f"pulling from dir {files_dir}")        
+# #         files = [join(files_dir, f) for f in listdir(files_dir) if isfile(join(files_dir, f))]
+# #         #validating
+# #         for file in files:
+# #             validate(vl1, 8, 20, file)   
             
-#         print("====================================")
+# #         print("====================================")
 
-    files_dir = "datasets/eth/train"
-    name = "eth_vl.pt"
-    print(f"pulling from dir {files_dir}")
-    files = [join(files_dir, f) for f in listdir(files_dir) if isfile(join(files_dir, f))]
-    #training
-    vl = train(8, 20, files, name=name)
+#     # files_dir = "datasets/eth/train"
+#     # name = "eth_vl.pt"
+#     # print(f"pulling from dir {files_dir}")
+#     # files = [join(files_dir, f) for f in listdir(files_dir) if isfile(join(files_dir, f))]
+#     # #training
+#     # vl = train(8, 20, files, name=name)
 
-    torch.cuda.empty_cache()
-    vl1 = torch.load("eth_vl.pt")
-    print(f"loading from eth_vl.pt")
-    #preparing validating set
-    files_dir = "datasets/eth/test"
-    print(f"pulling from dir {files_dir}")        
-    files = [join(files_dir, f) for f in listdir(files_dir) if isfile(join(files_dir, f))]
-    #validating
-    for file in files:
-        validate(vl1, 8, 20, file) 
+#     # torch.cuda.empty_cache()
+#     vl1 = torch.load("eth_vl.pt")
+#     print(f"loading from eth_vl.pt")
+#     #preparing validating set
+#     files_dir = "datasets/eth/test"
+#     print(f"pulling from dir {files_dir}")        
+#     files = [join(files_dir, f) for f in listdir(files_dir) if isfile(join(files_dir, f))]
+#     #validating
+#     for file in files:
+#         validate(vl1, 8, 20, file) 
 
 
-    # temp = train(8, 20, ["datasets/hotel/test/biwi_hotel.txt"])
-    # validate(temp, 8, 20, "datasets/eth/test/biwi_eth.txt")
-    # temp = torch.load("model.pt")
-    # validate(temp, 8, 20, "datasets/hotel/test/biwi_hotel.txt")
-    # validate(temp, 8, 20, "datasets/eth/test/biwi_eth.txt")
+#     # temp = train(8, 20, ["datasets/hotel/test/biwi_hotel.txt"])
+#     # validate(temp, 8, 20, "datasets/eth/test/biwi_eth.txt")
+#     # temp = torch.load("model.pt")
+#     # validate(temp, 8, 20, "datasets/hotel/test/biwi_hotel.txt")
+#     # validate(temp, 8, 20, "datasets/eth/test/biwi_eth.txt")
 
     # temp = train(8, 20, ["datasets/eth/test/biwi_eth.txt"])
-    # # temp = torch.load("model.pt")
-    # validate(temp, 8, 20, "try_dataset.txt")
+    temp = torch.load("eth_vl.pt")
+    validate(temp, 20, 20, "x_all.p")
