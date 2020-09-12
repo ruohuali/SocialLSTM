@@ -430,7 +430,7 @@ def train(T_obs, T_pred, files, model=None, name="model.pt"):
                     cost = criterion(Y_pred, Y_g)
                     # print(f"c {criterion(Y_pred, Y_g)}, s {strideReg(Y_pred, Y_g)}")
 
-                    if epoch % 10 != 9:
+                    if epoch % 5 == 4:
                         print(epoch, batch_idx, cost.item())
 
                     #save data for plotting
@@ -700,23 +700,23 @@ if __name__ == "__main__":
             
 # #         print("====================================")
 
-#     # files_dir = "datasets/eth/train"
-#     # name = "eth_vl.pt"
-#     # print(f"pulling from dir {files_dir}")
-#     # files = [join(files_dir, f) for f in listdir(files_dir) if isfile(join(files_dir, f))]
-#     # #training
-#     # vl = train(8, 20, files, name=name)
+    files_dir = "datasets/eth/train"
+    name = "eth_vl.pt"
+    print(f"pulling from dir {files_dir}")
+    files = [join(files_dir, f) for f in listdir(files_dir) if isfile(join(files_dir, f))]
+    #training
+    vl = train(8, 20, files, name=name)
 
-#     # torch.cuda.empty_cache()
-#     vl1 = torch.load("eth_vl.pt")
-#     print(f"loading from eth_vl.pt")
-#     #preparing validating set
-#     files_dir = "datasets/eth/test"
-#     print(f"pulling from dir {files_dir}")        
-#     files = [join(files_dir, f) for f in listdir(files_dir) if isfile(join(files_dir, f))]
-#     #validating
-#     for file in files:
-#         validate(vl1, 8, 20, file) 
+    torch.cuda.empty_cache()    
+    vl1 = torch.load("eth_vl.pt")
+    print(f"loading from eth_vl.pt")
+    #preparing validating set
+    files_dir = "datasets/eth/test"
+    print(f"pulling from dir {files_dir}")        
+    files = [join(files_dir, f) for f in listdir(files_dir) if isfile(join(files_dir, f))]
+    #validating
+    for file in files:
+        validate(vl1, 8, 20, file) 
 
 
 #     # temp = train(8, 20, ["datasets/hotel/test/biwi_hotel.txt"])
@@ -726,8 +726,8 @@ if __name__ == "__main__":
 #     # validate(temp, 8, 20, "datasets/eth/test/biwi_eth.txt")
 
     # temp = train(8, 20, ["datasets/eth/test/biwi_eth.txt"])
-    temp = torch.load("eth_vl.pt")
+    #temp = torch.load("eth_vl.pt")
 
-    validate(temp, 8, 20, "try_dataset.txt")
+    #validate(temp, 8, 20, "try_dataset.txt")
 
-    # validate(temp, 20, 40, "x_all.p")
+    validate(vl1, 20, 40, "x_all.p")
