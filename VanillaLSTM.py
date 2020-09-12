@@ -3,7 +3,6 @@
 # %%
 import torch
 from torch import nn
-from torch.distributions.multivariate_normal import MultivariateNormal
 import numpy as np
 import math
 from torch.utils.data import Dataset, DataLoader
@@ -13,7 +12,8 @@ import matplotlib.pyplot as plt
 from os import listdir
 from os.path import isfile, join
 import warnings
-warnings.filterwarnings("ignore", category=RuntimeWarning) 
+warnings.filterwarnings("ignore", category=RuntimeWarning)
+from copy import deepcopy 
 
 
 # %%
@@ -78,17 +78,11 @@ class FramesDataset(Dataset):
             file_data_tensors~tensor(frame num x traj num x 4): the position of each traj at each frame
                                                                 if not present default to (0,0)
     '''
-    def preprocess(self, path):
-        #open the file as it is
-        file_data = []
-        with open(path, 'r') as file:
-            for line in file:
-                line_data = [int(float(data)) if i < 2 else float(data) for i, data in enumerate(line.rsplit())]
-                line_data[2], line_data[3] = line_data[3], line_data[2]
-                file_data.append(line_data)
+    def preprocessBatch(self, file_data):
         file_data = sorted(file_data, key=lambda data : data[1])
         file_data_sort = sorted(file_data, key=lambda data : data[0])
         
+        #turn the file into time-major multidimensional tensor
         traj_list, participant_masks, coord_tensors = self.text2Tensor(file_data_sort)
         
         #process the file data such that it contains the offsets not global coords
@@ -102,16 +96,87 @@ class FramesDataset(Dataset):
         traj_list, participant_masks, off_tensors = self.text2Tensor(file_data_off)
         
         return traj_list, participant_masks, off_tensors, coord_tensors
-    
 
-    def __init__(self, path):
-        # global device 
-        # device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-        self.traj_list, self.participant_masks, self.off_data, self.coord_data = self.preprocess(path)
-        
+
+    def IdLongTrajs(self, length):
+        file_data = deepcopy(self.source_file)
+        file_data = sorted(file_data, key=lambda data : data[1])
+        #now file_data is original file data with sorted by traj
+        time_stamps = []
+        temp_traj_idx = file_data[0][1]
+        counter = 0
+        (t_s, t_e) = (file_data[0][0], file_data[0][0])
+        for i, line in enumerate(file_data):
+            if line[1] != temp_traj_idx:
+                if counter >= length:
+                    t_e = line[0]
+                    time_stamps.append((temp_traj_idx, t_s, file_data[i-1][0]))
+                temp_traj_idx = line[1]
+                counter = 0
+                t_s = line[0]
+            else:
+                counter+=1
+        return time_stamps
+
+
+    def storeFile(self,path):
+        #open the file as it is
+        file_data = []
+        with open(path, 'r') as file:
+            for line in file:
+                line_data = [int(float(data)) if i < 2 else float(data) for i, data in enumerate(line.rsplit())]
+                line_data[2], line_data[3] = line_data[3], line_data[2]
+                file_data.append(line_data)
+        return file_data
+
+    
+    def loadFileTime(self, t_s, t_e):
+        file_data = deepcopy(self.source_file)
+        file_data = sorted(file_data, key=lambda data : data[0])
+        ret_data = []
+        for line in file_data:
+            if t_s <= line[0] <= t_e:
+                ret_data.append(line)
+        return ret_data
+
+
+    def preprocess(self, length, ratio):
+        #find out the time step in source file
+        file_data = deepcopy(self.source_file)
+        file_data = sorted(file_data, key=lambda data : data[0])
+        for i in range(len(file_data)-1):
+            time_step = file_data[i+1][0]-file_data[i][0]
+            if time_step != 0:
+                break
+
+        time_stamps = self.IdLongTrajs(length*ratio)
+
+        for (traj_idx, t_s, t_e) in time_stamps:
+            traj_file_data = self.loadFileTime(t_s, t_s+(length+1)*time_step)
+            traj_list, participant_masks, off_data, coord_data = self.preprocessBatch(traj_file_data)
+            data_packet = { "traj_list":traj_list,
+                            "mask":participant_masks,
+                            "seq":off_data,
+                            "coord":coord_data }
+            self.data_packets.append(data_packet)
+
+    
+    def backCompatible(self, path):
+        file_data = deepcopy(self.source_file)
+        self.traj_list, self.participant_masks, self.off_data, self.coord_data = self.preprocessBatch(file_data)
+            
+
+    def __init__(self, path, length=20, ratio=0.9):
+        global device
+        device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+        self.source_file = self.storeFile(path)
+        self.data_packets = []
+        self.preprocess(length, ratio)
+        self.backCompatible(path)
+
 
     def __len__(self):
-        return len(self.off_data)
+        return len(self.data_packets)
     
 
     '''
@@ -121,22 +186,11 @@ class FramesDataset(Dataset):
     the accompanying mask tensor follows the same rule 
     '''
     def __getitem__(self, idx):
-        participant_mask = self.participant_masks[idx]
-        X = self.off_data[idx]
-        Z = torch.zeros(*X.shape)
-        for coords in self.coord_data:
-            if coords[0][0] == X[0][0]:
-                Z = coords
-        ret_data = {}
-        ret_data["seq"] = X
-        ret_data["mask"] = participant_mask
-        ret_data["idx"] = idx
-        ret_data["coords"] = Z
-        return ret_data
+        return self.data_packets[idx]
 
     
     def getTrajList(self):
-        return self.traj_list
+        return None
 
     
     def getParticipants(self):
@@ -164,26 +218,11 @@ class FramesDataset(Dataset):
     
     
     
-    
-# device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-
-# D = FramesDataset("try_dataset.txt")
-# Dloader = DataLoader(D, batch_size=20)
-
-# for i, data in enumerate(Dloader):
-#     if i == 0:
-#         print(f"idx {data['idx']}")
-#         print(f"X {data['seq'].shape}\n")
-#         for i in data['seq']:
-#             print(i)
-#         print(f"mask\n {data['mask']}")
-#         print(f"coords {data['coords'].shape}\n")   
-#         for i in data['coords']:
-#             print(i)       
-#         print("\n\n\n\ntemp \n\n")
-#         temp = D.getCoordinates(data['seq'])
-#         for i in temp:
-#             print(i)
+# if __name__ == '__main__':
+#     D = FramesDataset("try_dataset111.txt")
+#     for i in range(len(D)):
+#         data_packet = D[i]
+#         pdb.set_trace()
 
 
 # %%
@@ -295,65 +334,6 @@ def trajPruningByStride(part_mask, ref_tensor, in_tensors, length=0.3):
     return in_tensors
 
 
-'''pointless effort to make something right'''
-# def SDE(X, Y):
-#     X_all = X.reshape(X.shape[0]*X.shape[1],X.shape[2])
-#     Y_all = Y.reshape(Y.shape[0]*Y.shape[1],Y.shape[2])
-#     Loss = 0
-#     for x, y in zip(X_all, Y_all):
-#         dist = torch.dist(x, y)
-#         Loss += dist
-#     return Loss
-
-
-def in_list(part_mask, ref_tensor, in_tensors, length=0.3):
-    in_list = []
-    for traj in range(ref_tensor.shape[1]):
-        actual_strides = ref_tensor[:,traj,2:]
-        avg_stride_len = torch.mean(torch.abs(actual_strides[actual_strides!=torch.zeros(2, device=device)]))
-        if math.isnan(avg_stride_len) or avg_stride_len < length:
-            continue
-        else:
-            in_list.append(traj)
-    return in_list
-
-
-def FDE(X, Y, in_list):
-    X_all = X.reshape(X.shape[0]*X.shape[1],X.shape[2])
-    Y_all = Y.reshape(Y.shape[0]*Y.shape[1],Y.shape[2])    
-    Loss = torch.tensor(0. , device=device)
-    # pdb.set_trace()
-
-    for traj_idx in range(X.shape[1]):
-        fde = 0.
-        traj_mask = torch.tensor([[1.,1.] if i % X.shape[1] == traj_idx else [0.,0.] for i in range(X.shape[0]*X.shape[1])], device=device)
-        x_traj = X_all*traj_mask
-        y_traj = Y_all*traj_mask
-        x_final = torch.sum(x_traj, axis=1)
-        y_final = torch.sum(y_traj, axis=1)
-        fde = torch.dist(x_final, y_final)
-        Loss += fde
-    return Loss
-                
-def SDE(X, Y, in_list):
-    X_all = X.reshape(X.shape[0]*X.shape[1],X.shape[2])
-    Y_all = Y.reshape(Y.shape[0]*Y.shape[1],Y.shape[2])    
-    Loss = torch.tensor(0. , device=device)
-    # pdb.set_trace()
-
-    for traj_idx in range(X.shape[1]):
-        for t in range(X.shape[0]):
-            de = 0.
-            traj_mask = torch.tensor([[1.,1.] if i % X.shape[1] == traj_idx and i // X.shape[1] <= t else [0.,0.] for i in range(X.shape[0]*X.shape[1])], device=device)
-            x_traj = X_all*traj_mask
-            y_traj = Y_all*traj_mask
-            x_t = torch.sum(x_traj, axis=1)
-            y_t = torch.sum(y_traj, axis=1)
-            de = torch.dist(x_t, y_t)
-            Loss += de
-    return Loss
-
-
 def strideReg(X, Y):
     X_all = X.reshape(X.shape[0]*X.shape[1],X.shape[2])
     Y_all = Y.reshape(Y.shape[0]*Y.shape[1],Y.shape[2])    
@@ -381,66 +361,59 @@ def train(T_obs, T_pred, files, model=None, name="model.pt"):
 
     #define loss & optimizer
     criterion = nn.MSELoss(reduction="sum")
-    # optimizer = torch.optim.Adagrad(vl.parameters(), weight_decay=0.0005)
-    optimizer = torch.optim.Adam(vl.parameters(), weight_decay=0.0005)
-    # optimizer = torch.optim.SGD(vl.parameters(), lr=0.001, weight_decay=0.0005, momentum=0.9)
-    
+    optimizer = torch.optim.Adam(vl.parameters(), weight_decay=0.0005)    
 
     plot_data = {}
     for file in files:
         plot_data[file] = [[] for _ in range(60)]
 
-    EPOCH = 20
+    EPOCH = 3
     for epoch in range(EPOCH):
         print(f"epoch {epoch+1}/{EPOCH}  ")
+
         for file in files:
             print(f"training on {file}")                
             #try to train this
             dataset = FramesDataset(file)
-            dataloader = DataLoader(dataset, batch_size=batch_size)
 
-            traj_num = len(dataset.getTrajList())
-            h = torch.zeros(traj_num, h_dim, device=device)
-            c = torch.zeros(traj_num, h_dim, device=device)
+            for batch_idx, data in enumerate(dataset):
+                h = torch.zeros(data['seq'].shape[1], h_dim, device=device)
+                c = torch.zeros(data['seq'].shape[1], h_dim, device=device)
 
-            for batch_idx, data in enumerate(dataloader):
                 print(f"batch {batch_idx+1}/{len(dataset) // batch_size} ", end='\r')
-                if batch_idx < len(dataset) // batch_size:
-                    with torch.autograd.set_detect_anomaly(True):
-                        Y = data['seq'][:T_pred][:T_pred,:,2:].clone()
-                        input_seq = data['seq'][:T_pred].clone()
-                        part_masks = data['mask']
+                with torch.autograd.set_detect_anomaly(True):
+                    Y = data['seq'][:T_pred][:T_pred,:,2:].clone()
+                    input_seq = data['seq'][:T_pred].clone()
+                    part_masks = data['mask']
 
-                        #dirty truncate
-                        run_ratio = (T_obs+2)/T_pred
-                        input_seq = trajPruningByAppear(part_masks, ratio=run_ratio, in_tensor=input_seq) 
-                        Y = trajPruningByAppear(part_masks, ratio=run_ratio, in_tensor=Y)     
-                        # pr_masks = trajPruningByAppear(part_masks, ratio=run_ratio)         
-                        # (input_seq, Y, pr_masks) = trajPruningByStride(pr_masks, input_seq, (input_seq, Y, pr_masks))   
-                        # part_list = in_list(pr_masks, input_seq, (input_seq, Y, pr_masks))   
-                        
-                        #forward prop
-                        # output = vl(input_seq, pr_masks, h, c, Y, T_obs, T_pred)
-                        output = vl(input_seq, part_masks, h, c, Y, T_obs, T_pred)
+                    #dirty truncate
+                    run_ratio = (T_obs+2)/T_pred
+                    input_seq = trajPruningByAppear(part_masks, ratio=run_ratio, in_tensor=input_seq) 
+                    Y = trajPruningByAppear(part_masks, ratio=run_ratio, in_tensor=Y)     
+                    # pr_masks = trajPruningByAppear(part_masks, ratio=run_ratio)         
+                    # (input_seq, Y, pr_masks) = trajPruningByStride(pr_masks, input_seq, (input_seq, Y, pr_masks))   
+                    
+                    #forward prop
+                    output = vl(input_seq, part_masks, h, c, Y, T_obs, T_pred)
 
-                        #compute loss
-                        Y_pred = output[T_obs+1:T_pred]
-                        Y_g = Y[T_obs+1:T_pred]
+                    #compute loss
+                    Y_pred = output[T_obs+1:T_pred]
+                    Y_g = Y[T_obs+1:T_pred]
 
-                        cost = criterion(Y_pred, Y_g)
-                        # print(f"c {criterion(Y_pred, Y_g)}, s {strideReg(Y_pred, Y_g)}")
+                    cost = criterion(Y_pred, Y_g)
+                    # print(f"c {criterion(Y_pred, Y_g)}, s {strideReg(Y_pred, Y_g)}")
 
-                        if epoch % 10 == 9:
-                            print(epoch, batch_idx, cost.item())
+                    if epoch % 10 != 9:
+                        print(epoch, batch_idx, cost.item())
 
-                        #save data for plotting
-                        # plot_data[file][batch_idx].append(cost.item())
-                        plot_data[file][batch_idx].append(cost)
+                    #save data for plotting
+                    # plot_data[file][batch_idx].append(cost.item())
+                    plot_data[file][batch_idx].append(cost)
 
-                        #backward prop
-                        optimizer.zero_grad()
-                        cost.backward()
-                        optimizer.step()
+                    #backward prop
+                    optimizer.zero_grad()
+                    cost.backward()
+                    optimizer.step()
 
     toc = time.time()
     print(f"training consumed {toc-tic}")
@@ -483,12 +456,6 @@ def validate(model, T_obs, T_pred, file):
 
 #     dataset = FramesDataset("crowds_zara02.txt")
     dataset = FramesDataset(file)    
-    #a dataloader for now not sure how to use
-    dataloader = DataLoader(dataset, batch_size=batch_size)
-
-    traj_num = len(dataset.getTrajList())
-    h = torch.zeros(traj_num, h_dim, device=device)
-    c = torch.zeros(traj_num, h_dim, device=device)
     
     plotting_batches = np.arange(40)
     plotting_data = []
@@ -496,45 +463,48 @@ def validate(model, T_obs, T_pred, file):
     finalDispErrMeans = []    
     #validate the model based on the dataset
     print(f"validating on {file}")
-    for batch_idx, data in enumerate(dataloader):
-        if batch_idx < len(dataset) // batch_size:
-            Y = data['seq'][:T_pred,:,2:].clone()
-            input_seq = data['seq'][:T_pred].clone()
-            part_masks = data['mask']            
-            with torch.no_grad():         
-                print(f"batch {batch_idx+1}/{len(dataset) // batch_size}  ", end='\r')
-                #dirty truncate
-                run_ratio = (T_obs+2)/T_pred
-                input_seq = trajPruningByAppear(part_masks, ratio=run_ratio, in_tensor=input_seq) 
-                Y = trajPruningByAppear(part_masks, ratio=run_ratio, in_tensor=Y)     
-                pr_masks = trajPruningByAppear(part_masks, ratio=run_ratio)
-                (input_seq, Y, pr_masks) = trajPruningByStride(pr_masks, input_seq, (input_seq, Y, pr_masks))
-                
-                #forward prop
-                output = model(input_seq, pr_masks, h, c, Y, T_obs, T_pred)
-                # output = model(input_seq, part_masks, h, c, Y, T_obs, T_pred)
+    for batch_idx, data in enumerate(dataset):
+        traj_num = data['seq'].shape[1]
+        h = torch.zeros(data['seq'].shape[1], h_dim, device=device)
+        c = torch.zeros(data['seq'].shape[1], h_dim, device=device)
 
-                #compute cost
-                Y_pred = output[T_obs+1:T_pred]
-                Y_g = Y[T_obs+1:T_pred]
-                #......
+        Y = data['seq'][:T_pred,:,2:].clone()
+        input_seq = data['seq'][:T_pred].clone()
+        part_masks = data['mask']            
+        with torch.no_grad():         
+            print(f"batch {batch_idx+1}/{len(dataset)}  ", end='\r')
+            #dirty truncate
+            run_ratio = (T_obs+2)/T_pred
+            input_seq = trajPruningByAppear(part_masks, ratio=run_ratio, in_tensor=input_seq) 
+            # Y = trajPruningByAppear(part_masks, ratio=run_ratio, in_tensor=Y)     
+            # pr_masks = trajPruningByAppear(part_masks, ratio=run_ratio)
+            # (input_seq, Y, pr_masks) = trajPruningByStride(pr_masks, input_seq, (input_seq, Y, pr_masks))
+            
+            #forward prop
+            # output = model(input_seq, pr_masks, h, c, Y, T_obs, T_pred)
+            output = model(input_seq, part_masks, h, c, Y, T_obs, T_pred)
 
-                #get and process result                
-                Y_pred_param = Y_pred.clone()
-                coords_param = dataset.getCoordinates(data['seq']).clone()
+            #compute cost
+            Y_pred = output[T_obs+1:T_pred]
+            Y_g = Y[T_obs+1:T_pred]
+            #......
 
-                #save plotting data for visualization
-                if batch_idx in plotting_batches:
-                    plotting_data.append((Y_pred, part_masks, traj_num, batch_idx, dataset.getCoordinates(data['seq']), T_obs, True))
-                    plotting_data.append((Y_pred_param, part_masks, traj_num, batch_idx, dataset.getCoordinates(data['seq']), T_obs, False))                    
+            #get and process result                
+            Y_pred_param = Y_pred.clone()
+            coords_param = dataset.getCoordinates(data['seq']).clone()
 
-                if batch_idx in range(len(dataset) // batch_size-1):
-                    err = avgDispError(Y_pred_param, part_masks, traj_num, batch_idx, dataset.getCoordinates(data['seq']), T_obs)
-                    avgDispErrMeans.append(err)
+            #save plotting data for visualization
+            if batch_idx in plotting_batches:
+                plotting_data.append((Y_pred, part_masks, traj_num, batch_idx, dataset.getCoordinates(data['seq']), T_obs, True))
+                plotting_data.append((Y_pred_param, part_masks, traj_num, batch_idx, dataset.getCoordinates(data['seq']), T_obs, False))                    
 
-                if batch_idx in range(len(dataset) // batch_size-1):
-                    err = finalDispError(Y_pred_param, part_masks, traj_num, batch_idx, dataset.getCoordinates(data['seq']), T_obs)
-                    finalDispErrMeans.append(err)                
+            if batch_idx in range(len(dataset) // batch_size-1):
+                err = avgDispError(Y_pred_param, part_masks, traj_num, batch_idx, dataset.getCoordinates(data['seq']), T_obs)
+                avgDispErrMeans.append(err)
+
+            if batch_idx in range(len(dataset) // batch_size-1):
+                err = finalDispError(Y_pred_param, part_masks, traj_num, batch_idx, dataset.getCoordinates(data['seq']), T_obs)
+                finalDispErrMeans.append(err)                
         
     for d in plotting_data:
         plotting_batch(*d)
@@ -782,8 +752,6 @@ if __name__ == "__main__":
     # validate(temp, 8, 20, "datasets/hotel/test/biwi_hotel.txt")
     # validate(temp, 8, 20, "datasets/eth/test/biwi_eth.txt")
 
-    files_dir = "try_dataset"
-    files = [join(files_dir, f) for f in listdir(files_dir) if isfile(join(files_dir, f))]
-    temp = train(8, 20, files)
+    temp = train(8, 20, ["try_dataset.txt"])
     # temp = torch.load("model.pt")
-    validate(temp, 8, 20, "datasets/eth/test/biwi_eth.txt")
+    validate(temp, 8, 20, "try_dataset.txt")
