@@ -186,8 +186,8 @@ class FramesDataset(Dataset):
 
 
     def __init__(self, path, length=20, ratio=0.9, special=False):
-        special = True if ".p" in path else False
-        if not special:
+        self.special = True if ".p" in path else False
+        if not self.special:
             self.source_file = self.storeFile(path)
             self.data_packets = []
             self.preprocess(length, ratio)
@@ -505,6 +505,7 @@ def validate(model, T_obs, T_pred, file, model_type='v'):
     #validate the model based on the dataset
     print(f"validating on {file} {model_type}")
     for batch_idx, data in enumerate(dataset):
+        print(f"b  {batch_idx}")
         traj_num = data['seq'].shape[1]
         h = torch.zeros(data['seq'].shape[1], h_dim, device=device)
         c = torch.zeros(data['seq'].shape[1], h_dim, device=device)
@@ -531,17 +532,20 @@ def validate(model, T_obs, T_pred, file, model_type='v'):
             if model_type == 'v':
                 output = model(input_seq, part_masks, h, c, Y, T_obs, T_pred)
             else:
-                #catch the coords
-                coords = []
-                for t in range(input_seq.shape[0]):
-                    coord = []
-                    for traj_idx in range(input_seq.shape[1]):
-                        coord.append(dataset.getCoordinates(input_seq4[t,traj_idx,0].item(),
-                                                            input_seq4[t,traj_idx,1].item()))
-                    coords.append(coord)
-                coords = torch.tensor(coords, device=device)
+                if not dataset.special:
+                    #catch the coords
+                    coords = []
+                    for t in range(input_seq.shape[0]):
+                        coord = []
+                        for traj_idx in range(input_seq.shape[1]):
+                            coord.append(dataset.getCoordinates(input_seq4[t,traj_idx,0].item(),
+                                                                input_seq4[t,traj_idx,1].item()))
+                        coords.append(coord)
+                    coords = torch.tensor(coords, device=device)
+                else:
+                    coords = data['coords']
                 output = model(input_seq, coords, part_masks, h, c, Y, T_obs, T_pred)
-
+                    
 
             #compute cost
             Y_pred = output[T_obs+1:T_pred]
@@ -687,7 +691,8 @@ def plotting_batch(batch_trajs_pred_gpu, input_seq, dataset, T_obs, is_total, ba
 if __name__ == "__main__":
     # device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     global device
-    device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
+    # device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
+    device = torch.device("cpu")
     print(f"device {device}\n")
 
 #     # train_datasets = ["datasets/eth/train",
@@ -759,8 +764,8 @@ if __name__ == "__main__":
     vl = train(8, 20, files, name=name, model_type='s')
 
     torch.cuda.empty_cache()    
-    vl1 = torch.load("eth_vl.pt")
-    print(f"loading from eth_vl.pt")
+    vl1 = torch.load(name)
+    print(f"loading from {name}")
     #preparing validating set
     files_dir = "datasets/eth/test"
     print(f"pulling from dir {files_dir}")        
@@ -768,15 +773,17 @@ if __name__ == "__main__":
     #validating
     for file in files:
         validate(vl1, 8, 20, file, model_type='s') 
+
+    validate(vl1, 20, 40, "x_all.p", model_type='s')
     #################################################
 
     # temp = train(8, 20, ["datasets/hotel/test/biwi_hotel.txt"], model_type='s')
 #     # validate(temp, 8, 20, "datasets/eth/test/biwi_eth.txt")
-#     # temp = torch.load("model.pt")
+    # temp = torch.load("model.pt")
 #     # validate(temp, 8, 20, "datasets/hotel/test/biwi_hotel.txt")
 #     # validate(temp, 8, 20, "datasets/eth/test/biwi_eth.txt")
 
-    # temp = train(8, 20, ["try_dataset.txt"], model_type='s')
+    # temp = train(8, 20, ["datasets/eth/test/biwi_eth.txt"], model_type='s')
     # validate(temp, 8, 20, "try_dataset.txt", model_type='s')
 
-    # validate(vl1, 20, 40, "x_all.p")
+    # validate(temp, 20, 40, "x_all.p", model_type='s')

@@ -1,8 +1,9 @@
 from VanillaLSTM import *
-device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
+# device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
+device = torch.device("cpu")
 
 class SocialLSTM(nn.Module):
-    def __init__(self, input_dim=2, hidden_dim=20, mediate_dim=128, output_dim=2, social_dim=128, traj_num=3, dropout_prob=0.0,
+    def __init__(self, input_dim=2, hidden_dim=20, mediate_dim=128, output_dim=2, social_dim=16, traj_num=3, dropout_prob=0.0,
                 N_size=2, grid_cell_size=0.3):
         super(SocialLSTM, self).__init__()
         #specify params
@@ -59,7 +60,9 @@ class SocialLSTM(nn.Module):
         #get the splitting points after which pred starts        
         last_points = coords[T_obs+1,:]
         
-        for frame_idx, (x, coord) in enumerate(zip(X, coords)):      
+        for frame_idx, (x, coord) in enumerate(zip(X, coords)): 
+            if X.shape[1] > 50:    
+                print(f"f   {frame_idx}", end='\r') 
             if frame_idx > T_pred: 
                 outputs[frame_idx] = torch.zeros(X.shape[1], self.output_dim)
                 continue
