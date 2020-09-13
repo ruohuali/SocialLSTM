@@ -588,7 +588,7 @@ def validate(model, T_obs, T_pred, file, model_type='v'):
 
 
 
-def validateNew(model, T_obs, T_pred, file, model_type='v'):
+def validateNew(model, T_obs, T_pred, file, start, model_type='v'):
     #try to validate this
     h_dim = 128
     dataset = FramesDataset(file, special=True)    
@@ -604,7 +604,7 @@ def validateNew(model, T_obs, T_pred, file, model_type='v'):
 
         for traj in range(data['seq'].shape[1]):
             print(f"traj {traj}", end='\r')
-            if traj > 20:
+            if traj > start+500:
                 break
 
             Y1 = data['seq'][:T_pred,traj,:].clone()
@@ -656,6 +656,8 @@ def validateNew(model, T_obs, T_pred, file, model_type='v'):
         
     print("total avg disp mean ", np.sum(np.array(avgDispErrMeans))/len([v for v in avgDispErrMeans if v != 0]))
     print("total final disp mean ", np.sum(np.array(finalDispErrMeans))/len([v for v in finalDispErrMeans if v != 0]))    
+
+    return avgDispErrMeans, finalDispErrMeans
 
 
 
@@ -856,8 +858,16 @@ if __name__ == "__main__":
     # #validating
     # for file in files:
     #     validate(vl1, 8, 20, file, model_type='s') 
+    ADEs, FDEs = [], []
+    for i in range(86318 // 500):
+        print(f"running {i}")
+        ade, fde = validateNew(vl1, 20, 40, "x_all.p", i*500, model_type='s')
+        ADEs.extend(ade); fde.extend(fde)
 
-    validateNew(vl1, 20, 40, "x_all.p", model_type='s')
+
+    print("total avg disp mean ", np.sum(np.array(ADEs))/len([v for v in ADEs if v != 0]))
+    print("total final disp mean ", np.sum(np.array(FDEs))/len([v for v in FDEs if v != 0]))    
+
 
     # temp = train(8, 20, ["datasets/eth/test/biwi_eth.txt"], model_type='s')
     # temp = torch.load('model.pt')
