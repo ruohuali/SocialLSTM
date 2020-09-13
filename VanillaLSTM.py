@@ -80,9 +80,9 @@ class FramesDataset(Dataset):
             file_data_tensors~tensor(frame num x traj num x 4): the position of each traj at each frame
                                                                 if not present default to (0,0)
     '''
-    def preprocessBatch(self, file_data):
-        file_data = sorted(file_data, key=lambda data : data[1])
-        file_data_sort = sorted(file_data, key=lambda data : data[0])
+    def preprocessBatch(self, file_data_in):
+        file_data = sorted(file_data_in, key=lambda data : data[1])
+        file_data_sort = sorted(file_data_in, key=lambda data : data[0])
         
         #turn the file into time-major multidimensional tensor
         traj_list, participant_masks, coord_tensors = self.text2Tensor(file_data_sort)
@@ -92,11 +92,17 @@ class FramesDataset(Dataset):
         for i, line in enumerate(file_data):
             if i > 0:
                 if file_data[i][1] == file_data[i-1][1]:
-                    file_data_off.append([file_data[i][0], file_data[i][1], file_data[i][2]-file_data[i-1][2], file_data[i][3]-file_data[i-1][3]])
+                    file_data_off.append([file_data[i-1][0], file_data[i-1][1], file_data[i][2]-file_data[i-1][2], file_data[i][3]-file_data[i-1][3]])
         file_data_off.sort(key=lambda data : data[0])        
         
         traj_list, participant_masks, off_tensors = self.text2Tensor(file_data_off)
-        
+
+
+        # #get offsets
+        # off_tensors = torch.zeros(coord_tensors.shape[0]-1,coord_tensors.shape[1],coord_tensors.shape[2])
+        # for t in range(coord_tensors.shape[0]-1):
+        #     off_tensors[t] = coord_tensors[t+1] - coord_tensors[t]
+
         return traj_list, participant_masks, off_tensors, coord_tensors
 
 
@@ -429,7 +435,7 @@ def train(T_obs, T_pred, files, model_type='v', model=None, name="model.pt"):
                     if model_type == 'v':
                         output = vl(input_seq, part_masks, h, c, Y, T_obs, T_pred)
                     else:
-                        #catch the coords
+                        # catch the coords
                         coords = []
                         for t in range(input_seq.shape[0]):
                             coord = []
@@ -438,6 +444,7 @@ def train(T_obs, T_pred, files, model_type='v', model=None, name="model.pt"):
                                                                     input_seq4[t,traj_idx,1].item()))
                             coords.append(coord)
                         coords = torch.tensor(coords, device=device)
+                        # coords = data['coords'][:T_pred,:,2:]
                         output = vl(input_seq, coords, part_masks, h, c, Y, T_obs, T_pred)
                     # output = vl(input_seq, pr_masks, h, c, Y, T_obs, T_pred)
 
@@ -532,18 +539,22 @@ def validate(model, T_obs, T_pred, file, model_type='v'):
             if model_type == 'v':
                 output = model(input_seq, part_masks, h, c, Y, T_obs, T_pred)
             else:
-                if not dataset.special:
-                    #catch the coords
-                    coords = []
-                    for t in range(input_seq.shape[0]):
-                        coord = []
-                        for traj_idx in range(input_seq.shape[1]):
-                            coord.append(dataset.getCoordinates(input_seq4[t,traj_idx,0].item(),
-                                                                input_seq4[t,traj_idx,1].item()))
-                        coords.append(coord)
-                    coords = torch.tensor(coords, device=device)
+                # if not dataset.special:
+                #     #catch the coords
+                #     coords = []
+                #     for t in range(input_seq.shape[0]):
+                #         coord = []
+                #         for traj_idx in range(input_seq.shape[1]):
+                #             coord.append(dataset.getCoordinates(input_seq4[t,traj_idx,0].item(),
+                #                                                 input_seq4[t,traj_idx,1].item()))
+                #         coords.append(coord)
+                #     coords = torch.tensor(coords, device=device)
+                # else:
+                #     coords = data['coords']
+                if dataset.special:
+                    coords = data['coords'][:T_pred]
                 else:
-                    coords = data['coords']
+                    coords = data['coords'][:T_pred,:,2:]
                 output = model(input_seq, coords, part_masks, h, c, Y, T_obs, T_pred)
                     
 
@@ -756,25 +767,30 @@ if __name__ == "__main__":
     #     validate(vl1, 8, 20, file) 
 
     ###############################################
-    files_dir = "datasets/eth/train"
-    name = "eth_sl.pt"
-    print(f"pulling from dir {files_dir}")
-    files = [join(files_dir, f) for f in listdir(files_dir) if isfile(join(files_dir, f))]
-    #training
-    vl = train(8, 20, files, name=name, model_type='s')
+    # files_dir = "datasets/eth/train"
+    # name = "eth_sl.pt"
+    # print(f"pulling from dir {files_dir}")
+    # files = [join(files_dir, f) for f in listdir(files_dir) if isfile(join(files_dir, f))]
+    # #training
+    # vl = train(8, 20, files, name=name, model_type='s')
 
-    torch.cuda.empty_cache()    
-    vl1 = torch.load(name)
-    print(f"loading from {name}")
-    #preparing validating set
-    files_dir = "datasets/eth/test"
-    print(f"pulling from dir {files_dir}")        
-    files = [join(files_dir, f) for f in listdir(files_dir) if isfile(join(files_dir, f))]
-    #validating
-    for file in files:
-        validate(vl1, 8, 20, file, model_type='s') 
+    # torch.cuda.empty_cache()    
+    # vl1 = torch.load(name)
+    # print(f"loading from {name}")
+    # #preparing validating set
+    # files_dir = "datasets/eth/test"
+    # print(f"pulling from dir {files_dir}")        
+    # files = [join(files_dir, f) for f in listdir(files_dir) if isfile(join(files_dir, f))]
+    # #validating
+    # for file in files:
+    #     validate(vl1, 8, 20, file, model_type='s') 
 
-    validate(vl1, 20, 40, "x_all.p", model_type='s')
+    # validate(vl1, 20, 40, "x_all.p", model_type='s')
+
+    # temp = train(8, 20, ["datasets/eth/test/biwi_eth.txt"], model_type='s')
+    temp = torch.load('model.pt')
+    # validate(temp, 8, 20, "datasets/eth/test/biwi_eth.txt", model_type='s')
+    validate(temp, 20, 40, "x_all.p", model_type='s')
     #################################################
 
     # temp = train(8, 20, ["datasets/hotel/test/biwi_hotel.txt"], model_type='s')
@@ -783,7 +799,5 @@ if __name__ == "__main__":
 #     # validate(temp, 8, 20, "datasets/hotel/test/biwi_hotel.txt")
 #     # validate(temp, 8, 20, "datasets/eth/test/biwi_eth.txt")
 
-    # temp = train(8, 20, ["datasets/eth/test/biwi_eth.txt"], model_type='s')
-    # validate(temp, 8, 20, "try_dataset.txt", model_type='s')
 
-    # validate(temp, 20, 40, "x_all.p", model_type='s')
+
