@@ -767,30 +767,30 @@ if __name__ == "__main__":
     #     validate(vl1, 8, 20, file) 
 
     ###############################################
-    # files_dir = "datasets/eth/train"
-    # name = "eth_sl.pt"
-    # print(f"pulling from dir {files_dir}")
-    # files = [join(files_dir, f) for f in listdir(files_dir) if isfile(join(files_dir, f))]
-    # #training
-    # vl = train(8, 20, files, name=name, model_type='s')
+    files_dir = "datasets/eth/train"
+    name = "eth_sl.pt"
+    print(f"pulling from dir {files_dir}")
+    files = [join(files_dir, f) for f in listdir(files_dir) if isfile(join(files_dir, f))]
+    #training
+    vl = train(8, 20, files, name=name, model_type='s')
 
-    # torch.cuda.empty_cache()    
-    # vl1 = torch.load(name)
-    # print(f"loading from {name}")
-    # #preparing validating set
-    # files_dir = "datasets/eth/test"
-    # print(f"pulling from dir {files_dir}")        
-    # files = [join(files_dir, f) for f in listdir(files_dir) if isfile(join(files_dir, f))]
+    torch.cuda.empty_cache()    
+    vl1 = torch.load(name)
+    print(f"loading from {name}")
+    #preparing validating set
+    files_dir = "datasets/eth/test"
+    print(f"pulling from dir {files_dir}")        
+    files = [join(files_dir, f) for f in listdir(files_dir) if isfile(join(files_dir, f))]
     # #validating
     # for file in files:
     #     validate(vl1, 8, 20, file, model_type='s') 
 
-    # validate(vl1, 20, 40, "x_all.p", model_type='s')
+    validate(vl1, 20, 40, "x_all.p", model_type='s')
 
     # temp = train(8, 20, ["datasets/eth/test/biwi_eth.txt"], model_type='s')
-    temp = torch.load('model.pt')
+    # temp = torch.load('model.pt')
     # validate(temp, 8, 20, "datasets/eth/test/biwi_eth.txt", model_type='s')
-    validate(temp, 20, 40, "x_all.p", model_type='s')
+    # validate(temp, 20, 40, "x_all.p", model_type='s')
     #################################################
 
     # temp = train(8, 20, ["datasets/hotel/test/biwi_hotel.txt"], model_type='s')
