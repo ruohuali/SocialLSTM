@@ -1,3 +1,4 @@
+
 from VanillaLSTM import *
 # device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
 device = torch.device("cpu")
@@ -58,7 +59,7 @@ class SocialLSTM(nn.Module):
         outputs = torch.empty(X.shape[0], X.shape[1], self.output_dim, device=device)
         #array of abs coords
         #get the splitting points after which pred starts        
-        last_points = coords[T_obs+1,:]
+        last_points = coords[T_obs+1,:]     
         
         for frame_idx, (x, coord) in enumerate(zip(X, coords)): 
             if X.shape[1] > 50:    

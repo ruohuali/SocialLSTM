@@ -587,6 +587,78 @@ def validate(model, T_obs, T_pred, file, model_type='v'):
     print("total final disp mean ", np.sum(np.array(finalDispErrMeans))/len([v for v in finalDispErrMeans if v != 0]))    
 
 
+
+def validateNew(model, T_obs, T_pred, file, model_type='v'):
+    #try to validate this
+    h_dim = 128
+    dataset = FramesDataset(file, special=True)    
+    
+    plotting_batches = np.arange(20)
+    plotting_data = []
+    avgDispErrMeans = []
+    finalDispErrMeans = []    
+    #validate the model based on the dataset
+    print(f"validating on {file} {model_type}")
+    for batch_idx, data in enumerate(dataset):
+        print(f"b  {batch_idx}")
+
+        for traj in range(data['seq'].shape[1]):
+            print(f"traj {traj}", end='\r')
+            if traj > 20:
+                break
+
+            Y1 = data['seq'][:T_pred,traj,:].clone()
+            Y = data['seq'][:T_pred,traj,:].clone().reshape(Y1.shape[0], 1, Y1.shape[1])
+            input_seq = data['seq'][:T_pred,traj,:].clone().reshape(Y1.shape[0], 1, Y1.shape[1]) 
+            part_masks = torch.ones(input_seq.shape[0],1,1)
+            # pdb.set_trace()
+            coords1 = data['coords'][:T_pred,traj,:].clone() 
+            coords = data['coords'][:T_pred,traj,:].clone().reshape(coords1.shape[0], 1, coords1.shape[1])    
+
+            traj_num = input_seq.shape[1]
+            h = torch.zeros(1, h_dim, device=device)
+            c = torch.zeros(1, h_dim, device=device)
+
+            with torch.no_grad():         
+                print(f"batch {batch_idx+1}/{len(dataset)}  ", end='\r')
+
+                #forward prop
+                if model_type == 'v':
+                    output = model(input_seq, part_masks, h, c, Y, T_obs, T_pred)
+                else:
+                    coords = coords
+                    output = model(input_seq, coords, part_masks, h, c, Y, T_obs, T_pred)
+
+                #compute cost
+                Y_pred = output[T_obs+1:T_pred]
+                Y_g = Y[T_obs+1:T_pred]
+                #......
+                #get and process result                
+                # Y_pred_param = Y_pred.clone()
+                # coords_param = dataset.getCoordinates(data['seq']).clone()
+
+                #save plotting data for visualization
+                if batch_idx in plotting_batches:
+                    # plotting_data.append((Y_pred, part_masks, traj_num, batch_idx, dataset.getCoordinates(data['seq']), T_obs, True))
+                    plotting_data.append((Y_pred, data['seq'][:T_pred].clone(), dataset, T_obs, False, batch_idx))                    
+
+                if batch_idx in range(len(dataset)):
+                    err = ADE(Y_pred, Y_g)
+                    avgDispErrMeans.append(err)
+
+                if batch_idx in range(len(dataset)):
+                    err = FDE(Y_pred, Y_g)
+                    finalDispErrMeans.append(err)            
+        
+    # for i, d in enumerate(plotting_data):
+    #     print(f"plotting {i}th pic")
+    #     plotting_batch(*d)
+        
+    print("total avg disp mean ", np.sum(np.array(avgDispErrMeans))/len([v for v in avgDispErrMeans if v != 0]))
+    print("total final disp mean ", np.sum(np.array(finalDispErrMeans))/len([v for v in finalDispErrMeans if v != 0]))    
+
+
+
 # %%
 def ADE(X, Y):
     result = 0.
@@ -774,18 +846,18 @@ if __name__ == "__main__":
     #training
     #vl = train(8, 20, files, name=name, model_type='s')
 
-    torch.cuda.empty_cache()    
+    # torch.cuda.empty_cache()    
     vl1 = torch.load(name)
-    print(f"loading from {name}")
-    #preparing validating set
-    files_dir = "datasets/eth/test"
-    print(f"pulling from dir {files_dir}")        
-    files = [join(files_dir, f) for f in listdir(files_dir) if isfile(join(files_dir, f))]
-    #validating
-    for file in files:
-        validate(vl1, 8, 20, file, model_type='s') 
+    # print(f"loading from {name}")
+    # #preparing validating set
+    # files_dir = "datasets/eth/test"
+    # print(f"pulling from dir {files_dir}")        
+    # files = [join(files_dir, f) for f in listdir(files_dir) if isfile(join(files_dir, f))]
+    # #validating
+    # for file in files:
+    #     validate(vl1, 8, 20, file, model_type='s') 
 
-    #validate(vl1, 20, 40, "x_all.p", model_type='s')
+    validateNew(vl1, 20, 40, "x_all.p", model_type='s')
 
     # temp = train(8, 20, ["datasets/eth/test/biwi_eth.txt"], model_type='s')
     # temp = torch.load('model.pt')
