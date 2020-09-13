@@ -15,6 +15,7 @@ import warnings
 warnings.filterwarnings("ignore", category=RuntimeWarning)
 from copy import deepcopy 
 import pickle
+from SocialLSTM import *
 
 
 # %%
@@ -235,7 +236,7 @@ class FramesDataset(Dataset):
         traj_coords = []
         temp_traj_idx = file_data[0][1]
         for i, line in enumerate(file_data):
-            if line[1] != temp_traj_idx:
+            if line[1] != temp_traj_idx or i == len(file_data)-1:
                 trajs_coords[temp_traj_idx] = traj_coords
                 temp_traj_idx = line[1]
                 traj_coords = []
@@ -371,17 +372,21 @@ def strideReg(X, Y):
 
 
 # %%
-def train(T_obs, T_pred, files, model=None, name="model.pt"):
+def train(T_obs, T_pred, files, model_type='v', model=None, name="model.pt"):
     tic = time.time()
-    print(f"totally training on {files}")    
+    print(f"type {model_type} totally training on {files}")    
     #params
     h_dim = 128
 
     if model == None:
-        print("instantiating model")
-        vl = VanillaLSTM(hidden_dim=h_dim, mediate_dim=32, output_dim=2)
+        if model_type == 'v':
+            print("instantiating model "+model_type)
+            vl = VanillaLSTM(hidden_dim=h_dim, mediate_dim=32, output_dim=2)
+        else:
+            print("instantiating model "+model_type)
+            vl = SocialLSTM(hidden_dim=h_dim, mediate_dim=32, output_dim=2)            
     else:
-        print("reading model")
+        print("reading model "+model_type)
         vl = model
     vl.to(device)
 
@@ -410,6 +415,7 @@ def train(T_obs, T_pred, files, model=None, name="model.pt"):
                 with torch.autograd.set_detect_anomaly(True):
                     Y = data['seq'][:T_pred,:,2:].clone()
                     input_seq = data['seq'][:T_pred,:,2:].clone()
+                    input_seq4 = data['seq'][:T_pred,:,:].clone()
                     part_masks = data['mask']
 
                     #dirty truncate
@@ -420,7 +426,19 @@ def train(T_obs, T_pred, files, model=None, name="model.pt"):
                     # (input_seq, Y, pr_masks) = trajPruningByStride(pr_masks, input_seq, (input_seq, Y, pr_masks))   
                     
                     #forward prop
-                    output = vl(input_seq, part_masks, h, c, Y, T_obs, T_pred)
+                    if model_type == 'v':
+                        output = vl(input_seq, part_masks, h, c, Y, T_obs, T_pred)
+                    else:
+                        #catch the coords
+                        coords = []
+                        for t in range(input_seq.shape[0]):
+                            coord = []
+                            for traj_idx in range(input_seq.shape[1]):
+                                coord.append(dataset.getCoordinates(input_seq4[t,traj_idx,0].item(),
+                                                                    input_seq4[t,traj_idx,1].item()))
+                            coords.append(coord)
+                        coords = torch.tensor(coords, device=device)
+                        output = vl(input_seq, coords, part_masks, h, c, Y, T_obs, T_pred)
                     # output = vl(input_seq, pr_masks, h, c, Y, T_obs, T_pred)
 
                     #compute loss
@@ -475,7 +493,7 @@ def train(T_obs, T_pred, files, model=None, name="model.pt"):
 
 
 # %%
-def validate(model, T_obs, T_pred, file):
+def validate(model, T_obs, T_pred, file, model_type='v'):
     #try to validate this
     h_dim = 128
     dataset = FramesDataset(file, special=True)    
@@ -485,7 +503,7 @@ def validate(model, T_obs, T_pred, file):
     avgDispErrMeans = []
     finalDispErrMeans = []    
     #validate the model based on the dataset
-    print(f"validating on {file}")
+    print(f"validating on {file} {model_type}")
     for batch_idx, data in enumerate(dataset):
         traj_num = data['seq'].shape[1]
         h = torch.zeros(data['seq'].shape[1], h_dim, device=device)
@@ -494,10 +512,12 @@ def validate(model, T_obs, T_pred, file):
         if data['seq'].shape[2] > 2:
             Y = data['seq'][:T_pred,:,2:].clone()
             input_seq = data['seq'][:T_pred,:,2:].clone()
+            input_seq4 = data['seq'][:T_pred,:,:].clone()
         else:
             Y = data['seq'][:T_pred,:].clone()
             input_seq = data['seq'][:T_pred,:].clone()            
-        part_masks = data['mask']            
+        part_masks = data['mask']      
+        coords = data['coords']      
         with torch.no_grad():         
             print(f"batch {batch_idx+1}/{len(dataset)}  ", end='\r')
             #dirty truncate
@@ -508,8 +528,20 @@ def validate(model, T_obs, T_pred, file):
             # (input_seq, Y, pr_masks) = trajPruningByStride(pr_masks, input_seq, (input_seq, Y, pr_masks))
             
             #forward prop
-            output = model(input_seq, part_masks, h, c, Y, T_obs, T_pred)
-            # output = model(input_seq, pr_masks, h, c, Y, T_obs, T_pred)
+            if model_type == 'v':
+                output = model(input_seq, part_masks, h, c, Y, T_obs, T_pred)
+            else:
+                #catch the coords
+                coords = []
+                for t in range(input_seq.shape[0]):
+                    coord = []
+                    for traj_idx in range(input_seq.shape[1]):
+                        coord.append(dataset.getCoordinates(input_seq4[t,traj_idx,0].item(),
+                                                            input_seq4[t,traj_idx,1].item()))
+                    coords.append(coord)
+                coords = torch.tensor(coords, device=device)
+                output = model(input_seq, coords, part_masks, h, c, Y, T_obs, T_pred)
+
 
             #compute cost
             Y_pred = output[T_obs+1:T_pred]
@@ -655,7 +687,7 @@ def plotting_batch(batch_trajs_pred_gpu, input_seq, dataset, T_obs, is_total, ba
 if __name__ == "__main__":
     # device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     global device
-    device = torch.device("cpu")
+    device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
     print(f"device {device}\n")
 
 #     # train_datasets = ["datasets/eth/train",
@@ -700,34 +732,32 @@ if __name__ == "__main__":
             
 # #         print("====================================")
 
-    files_dir = "datasets/eth/train"
-    name = "eth_vl.pt"
-    print(f"pulling from dir {files_dir}")
-    files = [join(files_dir, f) for f in listdir(files_dir) if isfile(join(files_dir, f))]
-    #training
-    vl = train(8, 20, files, name=name)
+    # files_dir = "datasets/eth/train"
+    # name = "eth_vl.pt"
+    # print(f"pulling from dir {files_dir}")
+    # files = [join(files_dir, f) for f in listdir(files_dir) if isfile(join(files_dir, f))]
+    # #training
+    # vl = train(8, 20, files, name=name)
 
-    torch.cuda.empty_cache()    
-    vl1 = torch.load("eth_vl.pt")
-    print(f"loading from eth_vl.pt")
-    #preparing validating set
-    files_dir = "datasets/eth/test"
-    print(f"pulling from dir {files_dir}")        
-    files = [join(files_dir, f) for f in listdir(files_dir) if isfile(join(files_dir, f))]
-    #validating
-    for file in files:
-        validate(vl1, 8, 20, file) 
+    # torch.cuda.empty_cache()    
+    # vl1 = torch.load("eth_vl.pt")
+    # print(f"loading from eth_vl.pt")
+    # #preparing validating set
+    # files_dir = "datasets/eth/test"
+    # print(f"pulling from dir {files_dir}")        
+    # files = [join(files_dir, f) for f in listdir(files_dir) if isfile(join(files_dir, f))]
+    # #validating
+    # for file in files:
+    #     validate(vl1, 8, 20, file) 
 
 
-#     # temp = train(8, 20, ["datasets/hotel/test/biwi_hotel.txt"])
+    temp = train(8, 20, ["datasets/hotel/test/biwi_hotel.txt"], model_type='s')
 #     # validate(temp, 8, 20, "datasets/eth/test/biwi_eth.txt")
 #     # temp = torch.load("model.pt")
 #     # validate(temp, 8, 20, "datasets/hotel/test/biwi_hotel.txt")
 #     # validate(temp, 8, 20, "datasets/eth/test/biwi_eth.txt")
 
-    # temp = train(8, 20, ["datasets/eth/test/biwi_eth.txt"])
-    #temp = torch.load("eth_vl.pt")
+    # temp = train(8, 20, ["try_dataset.txt"], model_type='s')
+    validate(temp, 8, 20, "try_dataset.txt", model_type='s')
 
-    #validate(temp, 8, 20, "try_dataset.txt")
-
-    validate(vl1, 20, 40, "x_all.p")
+    # validate(vl1, 20, 40, "x_all.p")
