@@ -750,14 +750,33 @@ if __name__ == "__main__":
     # for file in files:
     #     validate(vl1, 8, 20, file) 
 
+    ###############################################
+    files_dir = "datasets/eth/train"
+    name = "eth_sl.pt"
+    print(f"pulling from dir {files_dir}")
+    files = [join(files_dir, f) for f in listdir(files_dir) if isfile(join(files_dir, f))]
+    #training
+    vl = train(8, 20, files, name=name, model_type='s')
 
-    temp = train(8, 20, ["datasets/hotel/test/biwi_hotel.txt"], model_type='s')
+    torch.cuda.empty_cache()    
+    vl1 = torch.load("eth_vl.pt")
+    print(f"loading from eth_vl.pt")
+    #preparing validating set
+    files_dir = "datasets/eth/test"
+    print(f"pulling from dir {files_dir}")        
+    files = [join(files_dir, f) for f in listdir(files_dir) if isfile(join(files_dir, f))]
+    #validating
+    for file in files:
+        validate(vl1, 8, 20, file, model_type='s') 
+    #################################################
+
+    # temp = train(8, 20, ["datasets/hotel/test/biwi_hotel.txt"], model_type='s')
 #     # validate(temp, 8, 20, "datasets/eth/test/biwi_eth.txt")
 #     # temp = torch.load("model.pt")
 #     # validate(temp, 8, 20, "datasets/hotel/test/biwi_hotel.txt")
 #     # validate(temp, 8, 20, "datasets/eth/test/biwi_eth.txt")
 
     # temp = train(8, 20, ["try_dataset.txt"], model_type='s')
-    validate(temp, 8, 20, "try_dataset.txt", model_type='s')
+    # validate(temp, 8, 20, "try_dataset.txt", model_type='s')
 
     # validate(vl1, 20, 40, "x_all.p")
