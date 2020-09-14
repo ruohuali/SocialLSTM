@@ -597,18 +597,14 @@ def validateNew(model, T_obs, T_pred, file, start, end, model_type='v'):
     plotting_data = []
     avgDispErrMeans = []
     finalDispErrMeans = []    
-    result_coords = []
     #validate the model based on the dataset
     print(f"validating on {file} {model_type}")
     for batch_idx, data in enumerate(dataset):
         print(f"b  {batch_idx}")
 
-        for traj in range(data['seq'].shape[1]):
-            print(f"dealing with traj {traj}", end='\n')
-            if traj < start:
-                continue
-            if traj > end:
-                break
+        result_coords = torch.zeros(40, 86318, 2)
+        for traj in range(start,end):
+            print(f"dealing with {traj}")
 
             Y1 = data['seq'][:T_pred,traj,:].clone()
             Y = data['seq'][:T_pred,traj,:].clone().reshape(Y1.shape[0], 1, Y1.shape[1])
@@ -633,7 +629,7 @@ def validateNew(model, T_obs, T_pred, file, start, end, model_type='v'):
                     output = model(input_seq, coords, part_masks, h, c, Y, T_obs, T_pred)
 
                 #save result
-                result_coord = calcCoordinatesNew(input_seq[0], output)
+                result_coords[traj] = calcCoordinatesNew(input_seq[0], output)
 
                 #compute cost
                 Y_pred = output[T_obs+1:T_pred]
@@ -656,25 +652,23 @@ def validateNew(model, T_obs, T_pred, file, start, end, model_type='v'):
     #     print(f"plotting {i}th pic")
     #     plotting_batch(*d)
         
-    result_coords = torch.tensor(result_coords)
     ade = np.sum(np.array(avgDispErrMeans))/len([v for v in avgDispErrMeans if v != 0])
     fde = np.sum(np.array(finalDispErrMeans))/len([v for v in finalDispErrMeans if v != 0])
     with open("results.txt",'a') as f:
-        f.write(str(start)+"-"+str(end)+": "+str(ade)+" "+str"fde")
+        f.write(str(start)+"-"+str(end)+": "+str(ade)+" "+str(fde))
     print("total avg disp mean ", ade)
     print("total final disp mean ", fde)    
 
-    torch.save(result_coords,str(start)+"-"+str(end))
+    torch.save(result_coords,"result_trajs/"+str(start)+"-"+str(end))
 
     return avgDispErrMeans, finalDispErrMeans
 
 def calcCoordinatesNew(start_point, offsets):
     next_point = start_point
-    coords = [start_point]
-    for offset in offsets:
+    coords = torch.zeros(offsets.shape[0]+1,offsets.shape[1],offsets.shape[2])
+    for t, offset in enumerate(offsets):
         next_point += offset
-        coords.append(next_point)
-    coords = torch.Tensor(coords)
+        coords[t] = next_point.clone()
     return coords
 
 # %%
@@ -690,7 +684,7 @@ def ADE(X, Y):
         dist /= X.shape[0]
         result += dist
     result /= X.shape[1]
-    print(f"avg disp error {result}")
+    #print(f"avg disp error {result}")
     return result    
 
 
@@ -705,7 +699,7 @@ def FDE(X, Y):
         dist += torch.dist(pos_Y, pos_X)
         result += dist
     result /= X.shape[1]
-    print(f"final disp error {result}")
+    #print(f"final disp error {result}")
     return result        
 
 
@@ -876,11 +870,11 @@ if __name__ == "__main__":
     #     validate(vl1, 8, 20, file, model_type='s') 
     ADEs, FDEs = [], []
 
-    ade, fde = validateNew(vl1, 20, 40, "x_all.p", 1, 500, model_type='s')
+    ade, fde = validateNew(vl1, 20, 40, "x_all.p", 0, 550, model_type='s')
     ADEs.extend(ade); fde.extend(fde)
 
-    print("total avg disp mean ", np.sum(np.array(ADEs))/len([v for v in ADEs if v != 0]))
-    print("total final disp mean ", np.sum(np.array(FDEs))/len([v for v in FDEs if v != 0]))    
+    #print("total avg disp mean ", np.sum(np.array(ADEs))/len([v for v in ADEs if v != 0]))
+    #print("total final disp mean ", np.sum(np.array(FDEs))/len([v for v in FDEs if v != 0]))    
 
 
     # temp = train(8, 20, ["datasets/eth/test/biwi_eth.txt"], model_type='s')
