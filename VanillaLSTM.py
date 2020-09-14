@@ -588,7 +588,7 @@ def validate(model, T_obs, T_pred, file, model_type='v'):
 
 
 
-def validateNew(model, T_obs, T_pred, file, start, model_type='v'):
+def validateNew(model, T_obs, T_pred, file, start, end, model_type='v'):
     #try to validate this
     h_dim = 128
     dataset = FramesDataset(file, special=True)    
@@ -597,14 +597,17 @@ def validateNew(model, T_obs, T_pred, file, start, model_type='v'):
     plotting_data = []
     avgDispErrMeans = []
     finalDispErrMeans = []    
+    result_coords = []
     #validate the model based on the dataset
     print(f"validating on {file} {model_type}")
     for batch_idx, data in enumerate(dataset):
         print(f"b  {batch_idx}")
 
         for traj in range(data['seq'].shape[1]):
-            print(f"traj {traj}", end='\r')
-            if traj > start+500:
+            print(f"dealing with traj {traj}", end='\n')
+            if traj < start:
+                continue
+            if traj > end:
                 break
 
             Y1 = data['seq'][:T_pred,traj,:].clone()
@@ -629,13 +632,12 @@ def validateNew(model, T_obs, T_pred, file, start, model_type='v'):
                     coords = coords
                     output = model(input_seq, coords, part_masks, h, c, Y, T_obs, T_pred)
 
+                #save result
+                result_coord = calcCoordinatesNew(input_seq[0], output)
+
                 #compute cost
                 Y_pred = output[T_obs+1:T_pred]
                 Y_g = Y[T_obs+1:T_pred]
-                #......
-                #get and process result                
-                # Y_pred_param = Y_pred.clone()
-                # coords_param = dataset.getCoordinates(data['seq']).clone()
 
                 #save plotting data for visualization
                 if batch_idx in plotting_batches:
@@ -654,12 +656,26 @@ def validateNew(model, T_obs, T_pred, file, start, model_type='v'):
     #     print(f"plotting {i}th pic")
     #     plotting_batch(*d)
         
-    print("total avg disp mean ", np.sum(np.array(avgDispErrMeans))/len([v for v in avgDispErrMeans if v != 0]))
-    print("total final disp mean ", np.sum(np.array(finalDispErrMeans))/len([v for v in finalDispErrMeans if v != 0]))    
+    result_coords = torch.tensor(result_coords)
+    ade = np.sum(np.array(avgDispErrMeans))/len([v for v in avgDispErrMeans if v != 0])
+    fde = np.sum(np.array(finalDispErrMeans))/len([v for v in finalDispErrMeans if v != 0])
+    with open("results.txt",'a') as f:
+        f.write(str(start)+"-"+str(end)+": "+str(ade)+" "+str"fde")
+    print("total avg disp mean ", ade)
+    print("total final disp mean ", fde)    
+
+    torch.save(result_coords,str(start)+"-"+str(end))
 
     return avgDispErrMeans, finalDispErrMeans
 
-
+def calcCoordinatesNew(start_point, offsets):
+    next_point = start_point
+    coords = [start_point]
+    for offset in offsets:
+        next_point += offset
+        coords.append(next_point)
+    coords = torch.Tensor(coords)
+    return coords
 
 # %%
 def ADE(X, Y):
@@ -840,7 +856,7 @@ if __name__ == "__main__":
     # for file in files:
     #     validate(vl1, 8, 20, file) 
 
-    ###############################################
+    ###################################################################
     #files_dir = "datasets/eth/train"
     name = "eth_sl.pt"
     #print(f"pulling from dir {files_dir}")
@@ -859,11 +875,9 @@ if __name__ == "__main__":
     # for file in files:
     #     validate(vl1, 8, 20, file, model_type='s') 
     ADEs, FDEs = [], []
-    for i in range(86318 // 500):
-        print(f"running {i}")
-        ade, fde = validateNew(vl1, 20, 40, "x_all.p", i*500, model_type='s')
-        ADEs.extend(ade); fde.extend(fde)
 
+    ade, fde = validateNew(vl1, 20, 40, "x_all.p", 1, 500, model_type='s')
+    ADEs.extend(ade); fde.extend(fde)
 
     print("total avg disp mean ", np.sum(np.array(ADEs))/len([v for v in ADEs if v != 0]))
     print("total final disp mean ", np.sum(np.array(FDEs))/len([v for v in FDEs if v != 0]))    
@@ -873,7 +887,7 @@ if __name__ == "__main__":
     # temp = torch.load('model.pt')
     # validate(temp, 8, 20, "datasets/eth/test/biwi_eth.txt", model_type='s')
     # validate(temp, 20, 40, "x_all.p", model_type='s')
-    #################################################
+    ###############################################################
 
     # temp = train(8, 20, ["datasets/hotel/test/biwi_hotel.txt"], model_type='s')
 #     # validate(temp, 8, 20, "datasets/eth/test/biwi_eth.txt")
