@@ -15,6 +15,7 @@ import warnings
 warnings.filterwarnings("ignore", category=RuntimeWarning)
 from copy import deepcopy 
 import pickle
+import sys
 from SocialLSTM import *
 
 
@@ -654,11 +655,13 @@ def validateNew(model, T_obs, T_pred, file, start, end, model_type='v'):
         
     ade = np.sum(np.array(avgDispErrMeans))/len([v for v in avgDispErrMeans if v != 0])
     fde = np.sum(np.array(finalDispErrMeans))/len([v for v in finalDispErrMeans if v != 0])
+    print(f"writing {start}-{end} {ade} {fde}")
     with open("results.txt",'a') as f:
         f.write(str(start)+"-"+str(end)+": "+str(ade)+" "+str(fde))
     print("total avg disp mean ", ade)
     print("total final disp mean ", fde)    
 
+    print(f"saving to {"result_trajs/"+str(start)+"-"+str(end)}")
     torch.save(result_coords,"result_trajs/"+str(start)+"-"+str(end))
 
     return avgDispErrMeans, finalDispErrMeans
@@ -868,9 +871,11 @@ if __name__ == "__main__":
     # #validating
     # for file in files:
     #     validate(vl1, 8, 20, file, model_type='s') 
-    ADEs, FDEs = [], []
-
-    ade, fde = validateNew(vl1, 20, 40, "x_all.p", 0, 550, model_type='s')
+    
+    start = sys.argv[0]*550
+    end = start+550
+    print(f"doing {start}-{end}")
+    ade, fde = validateNew(vl1, 20, 40, "x_all.p", start, end, model_type='s')
     ADEs.extend(ade); fde.extend(fde)
 
     #print("total avg disp mean ", np.sum(np.array(ADEs))/len([v for v in ADEs if v != 0]))
