@@ -605,7 +605,8 @@ def validateNew(model, T_obs, T_pred, file, start, end, model_type='v'):
 
         result_coords = torch.zeros(40, 86318, 2)
         for traj in range(start,end):
-            print(f"dealing with {traj}")
+            if traj % 100 == 99:
+                print(f"dealing with {traj}")
 
             Y1 = data['seq'][:T_pred,traj,:].clone()
             Y = data['seq'][:T_pred,traj,:].clone().reshape(Y1.shape[0], 1, Y1.shape[1])
@@ -630,7 +631,7 @@ def validateNew(model, T_obs, T_pred, file, start, end, model_type='v'):
                     output = model(input_seq, coords, part_masks, h, c, Y, T_obs, T_pred)
 
                 #save result
-                result_coords[traj] = calcCoordinatesNew(input_seq[0], output)
+                result_coords[:,traj,:] = calcCoordinatesNew(input_seq[0], output)
 
                 #compute cost
                 Y_pred = output[T_obs+1:T_pred]
@@ -657,12 +658,12 @@ def validateNew(model, T_obs, T_pred, file, start, end, model_type='v'):
     fde = np.sum(np.array(finalDispErrMeans))/len([v for v in finalDispErrMeans if v != 0])
     print(f"writing {start}-{end} {ade} {fde}")
     with open("results.txt",'a') as f:
-        f.write(str(start)+"-"+str(end)+": "+str(ade)+" "+str(fde))
+        f.write(str(start)+"-"+str(end)+": "+str(ade)+" "+str(fde)+"\n")
     print("total avg disp mean ", ade)
     print("total final disp mean ", fde)    
 
-    print(f"saving to {"result_trajs/"+str(start)+"-"+str(end)}")
-    torch.save(result_coords,"result_trajs/"+str(start)+"-"+str(end))
+    print(f"saving to {start}-{end}")
+    torch.save(result_coords,"re_trajs/"+str(start)+"-"+str(end))
 
     return avgDispErrMeans, finalDispErrMeans
 
@@ -672,6 +673,7 @@ def calcCoordinatesNew(start_point, offsets):
     for t, offset in enumerate(offsets):
         next_point += offset
         coords[t] = next_point.clone()
+    coords = coords.reshape((40,2))
     return coords
 
 # %%
@@ -872,11 +874,10 @@ if __name__ == "__main__":
     # for file in files:
     #     validate(vl1, 8, 20, file, model_type='s') 
     
-    start = sys.argv[0]*550
+    start = int(sys.argv[1])*550
     end = start+550
     print(f"doing {start}-{end}")
     ade, fde = validateNew(vl1, 20, 40, "x_all.p", start, end, model_type='s')
-    ADEs.extend(ade); fde.extend(fde)
 
     #print("total avg disp mean ", np.sum(np.array(ADEs))/len([v for v in ADEs if v != 0]))
     #print("total final disp mean ", np.sum(np.array(FDEs))/len([v for v in FDEs if v != 0]))    
