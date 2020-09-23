@@ -1,7 +1,6 @@
 
 from VanillaLSTM import *
-# device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
-device = torch.device("cpu")
+device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
 
 class SocialLSTM(nn.Module):
     def __init__(self, input_dim=2, hidden_dim=20, mediate_dim=128, output_dim=2, social_dim=16, traj_num=3, dropout_prob=0.0,

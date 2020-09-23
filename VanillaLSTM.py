@@ -9,7 +9,7 @@ from torch.utils.data import Dataset, DataLoader
 import pdb 
 import time
 import matplotlib.pyplot as plt
-from os import listdir
+from os import listdir, remove
 from os.path import isfile, join
 import warnings
 warnings.filterwarnings("ignore", category=RuntimeWarning)
@@ -17,6 +17,7 @@ from copy import deepcopy
 import pickle
 import sys
 from SocialLSTM import *
+import argparse
 
 
 # %%
@@ -261,19 +262,6 @@ class FramesDataset(Dataset):
 
 
 # %%
-class LinearNet(nn.Module):
-    def __init__(self, input_dim, output_dim, l1_dim=6, l2_dim=32, l3_dim=64, l4_dim=100):
-        super(LinearNet, self).__init__()
-        self.lin1 = nn.Linear(input_dim, l1_dim)
-        self.lin2 = nn.Linear(l1_dim, l2_dim)
-        self.lin3 = nn.Linear(l2_dim, l3_dim)
-        self.lin4 = nn.Linear(l3_dim, l4_dim)
-        self.lin5 = nn.Linear(l4_dim, output_dim)
-
-    def forward(self, x):
-        return self.lin5(self.lin4(self.lin3(self.lin2(self.lin1(x)))))
-
-
 class Phi(nn.Module):
     ''' a non-linear layer'''
     def __init__(self, dropout_prob):
@@ -295,8 +283,6 @@ class VanillaLSTM(nn.Module):
         self.LSTMCell = nn.LSTMCell(mediate_dim, hidden_dim)
         self.OutputLayer = nn.Linear(hidden_dim, output_dim)
         self.Phi = Phi(dropout_prob=dropout_prob)
-        self.LinearNet = LinearNet(input_dim=input_dim, output_dim=mediate_dim)
-
 
     def forward(self, X, part_masks, all_h_t, all_c_t, Y, T_obs, T_pred):
         outputs = torch.empty(X.shape[0], X.shape[1], self.output_dim, device=device)
@@ -307,14 +293,12 @@ class VanillaLSTM(nn.Module):
                 
             elif frame_idx <= T_obs:
                 r = self.Phi(self.InputLayer(x))
-                # r = self.LinearNet(x[:,2:])
                 all_h_t, all_c_t = self.LSTMCell(r, (all_h_t, all_c_t))
                 part_mask = torch.t(part_masks[frame_idx]).expand(part_masks[frame_idx].shape[1], self.output_dim)
                 outputs[frame_idx] = self.OutputLayer(all_h_t) * part_mask
                 
             elif frame_idx > T_obs and frame_idx <= T_pred:
                 r = self.Phi(self.InputLayer(outputs[frame_idx-1].clone()))
-                # r = self.LinearNet(outputs[frame_idx-1].clone())
                 all_h_t, all_c_t = self.LSTMCell(r, (all_h_t, all_c_t))
                 part_mask = torch.t(part_masks[frame_idx]).expand(part_masks[frame_idx].shape[1], self.output_dim)
                 outputs[frame_idx] = self.OutputLayer(all_h_t) * part_mask                
@@ -379,7 +363,7 @@ def strideReg(X, Y):
 
 
 # %%
-def train(T_obs, T_pred, files, model_type='v', model=None, name="model.pt"):
+def train(T_obs, T_pred, files, model_type='v', model=None, name="model.pt", EPOCH=5):
     tic = time.time()
     print(f"type {model_type} totally training on {files}")    
     #params
@@ -405,7 +389,6 @@ def train(T_obs, T_pred, files, model_type='v', model=None, name="model.pt"):
     for file in files:
         plot_data[file] = [[] for _ in range(500)]
 
-    EPOCH = 5
     for epoch in range(EPOCH):
         print(f"epoch {epoch+1}/{EPOCH}  ")
 
@@ -472,6 +455,10 @@ def train(T_obs, T_pred, files, model_type='v', model=None, name="model.pt"):
     print(f"training consumed {toc-tic}")
 
     #plot cost
+    print("removing old pics")
+    filelist = [f for f in listdir('eth_plots') if f.endswith(".png") ]
+    for f in filelist:
+        remove(join(mydir, f))
     def ppp(v,j):
         plt.figure()
         plt.title(str(vl.hidden_dim))
@@ -482,16 +469,8 @@ def train(T_obs, T_pred, files, model_type='v', model=None, name="model.pt"):
         print("--->","eth_plots/"+"train"+str(j))
     j = 0
     for k, v in plot_data.items():
-        #print(f"k {k} \n v {v[0]} {len(v)}")
         ppp(v,j)
         j+=1
-    
-    # plot_data = np.array(plot_data)
-    # avg_plot_data = np.mean(plot_data, axis=0)
-    # plt.figure()
-    # plt.plot(avg_plot_data)
-    # plt.savefig("eth_plots/"+"train"+str(i)+"avg")
-    
 
     #save the model
     torch.save(vl, name)
@@ -580,9 +559,9 @@ def validate(model, T_obs, T_pred, file, model_type='v'):
                 err = FDE(Y_pred, Y_g)
                 finalDispErrMeans.append(err)            
         
-    # for i, d in enumerate(plotting_data):
-    #     print(f"plotting {i}th pic")
-    #     plotting_batch(*d)
+    for i, d in enumerate(plotting_data):
+        print(f"plotting {i}th pic")
+        plotting_batch(*d)
         
     print("total avg disp mean ", np.sum(np.array(avgDispErrMeans))/len([v for v in avgDispErrMeans if v != 0]))
     print("total final disp mean ", np.sum(np.array(finalDispErrMeans))/len([v for v in finalDispErrMeans if v != 0]))    
@@ -783,17 +762,59 @@ def plotting_batch(batch_trajs_pred_gpu, input_seq, dataset, T_obs, is_total, ba
  
     plt.legend(loc="upper right")
     plt.title(f"batch {batch_idx}")
-    plt.savefig("eth_plots/"+str(batch_idx)+str(is_total)+"6-6-20-all")    
-
+    plt.savefig("eth_plots/"+str(batch_idx)+str(is_total))    
 
 
 # %%
-if __name__ == "__main__":
-    # device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+def parse_args():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--special", default=False, type=bool)
+    parser.add_argument("--dataset", default="eth", type=str)
+    parser.add_argument("--T_obs", default=8, type=int)
+    parser.add_argument("--T_pred", default=12, type=int)    
+    parser.add_argument("--epoch", default=25, type=int)
+    parser.add_argument("--model_name", default="a_just_trained_model_for_")
+    parser.add_argument("model_type", type=str)
+    parser.add_argument("--pure_val_name", default='', type=str)
+    return parser.parse_args()
+
+
+def main():
+    #set device
     global device
-    # device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
-    device = torch.device("cpu")
+    device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
     print(f"device {device}\n")
+
+    #read args
+    args = parse_args()
+
+    if args.pure_val_name == '':
+        #train loop
+        files_dir = join("datasets", args.dataset, "train")
+        name = args.model_name+args.dataset+'.pt'
+        print(f"pulling from dir {files_dir}")
+        files = [join(files_dir, f) for f in listdir(files_dir) if isfile(join(files_dir, f))]
+        #training
+        m = train(args.T_obs, args.T_pred, files, model_type=args.model_type, name=name, EPOCH=args.epoch)
+    else:
+        name = args.pure_val_name
+
+    #validate loop
+    torch.cuda.empty_cache()    
+    m = torch.load(name)
+    print(f"loading from {name}")
+    #preparing validating set
+    files_dir = join("datasets", args.dataset, "test")
+    print(f"pulling from dir {files_dir}")        
+    files = [join(files_dir, f) for f in listdir(files_dir) if isfile(join(files_dir, f))]
+    #validating
+    for file in files:
+        validate(m, args.T_obs, args.T_pred, file, model_type=args.model_type)     
+
+# %%
+if __name__ == "__main__":
+    main()
+
 
 #     # train_datasets = ["datasets/eth/train",
 #     #                   "datasets/hotel/train",               
@@ -857,14 +878,14 @@ if __name__ == "__main__":
 
     ###################################################################
     #files_dir = "datasets/eth/train"
-    name = "eth_sl.pt"
+    # name = "eth_sl.pt"
     #print(f"pulling from dir {files_dir}")
     #files = [join(files_dir, f) for f in listdir(files_dir) if isfile(join(files_dir, f))]
     #training
     #vl = train(8, 20, files, name=name, model_type='s')
 
     # torch.cuda.empty_cache()    
-    vl1 = torch.load(name)
+    # vl1 = torch.load(name)
     # print(f"loading from {name}")
     # #preparing validating set
     # files_dir = "datasets/eth/test"
@@ -874,10 +895,10 @@ if __name__ == "__main__":
     # for file in files:
     #     validate(vl1, 8, 20, file, model_type='s') 
     
-    start = int(sys.argv[1])*550
-    end = start+550
-    print(f"doing {start}-{end}")
-    ade, fde = validateNew(vl1, 20, 40, "x_all.p", start, end, model_type='s')
+    # start = int(sys.argv[1])*550
+    # end = start+550
+    # print(f"doing {start}-{end}")
+    # ade, fde = validateNew(vl1, 20, 40, "x_all.p", start, end, model_type='s')
 
     #print("total avg disp mean ", np.sum(np.array(ADEs))/len([v for v in ADEs if v != 0]))
     #print("total final disp mean ", np.sum(np.array(FDEs))/len([v for v in FDEs if v != 0]))    
