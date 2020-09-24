@@ -458,7 +458,7 @@ def train(T_obs, T_pred, files, model_type='v', model=None, name="model.pt", EPO
     print("removing old pics")
     filelist = [f for f in listdir('eth_plots') if f.endswith(".png") ]
     for f in filelist:
-        remove(join(mydir, f))
+        remove(join('eth_plots', f))
     def ppp(v,j):
         plt.figure()
         plt.title(str(vl.hidden_dim))
@@ -767,6 +767,8 @@ def plotting_batch(batch_trajs_pred_gpu, input_seq, dataset, T_obs, is_total, ba
 
 # %%
 def parse_args():
+    ''' 
+    python3 VanillaLSTM.py "s" --dataset "eth" --epoch 3 '''
     parser = argparse.ArgumentParser()
     parser.add_argument("--special", default=False, type=bool)
     parser.add_argument("--dataset", default="eth", type=str)
