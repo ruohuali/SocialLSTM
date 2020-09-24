@@ -492,7 +492,7 @@ def validate(model, T_obs, T_pred, file, model_type='v'):
     #validate the model based on the dataset
     print(f"validating on {file} {model_type}")
     for batch_idx, data in enumerate(dataset):
-        print(f"b  {batch_idx}")
+        print(f"batch  {batch_idx}", end='\r')
         traj_num = data['seq'].shape[1]
         h = torch.zeros(data['seq'].shape[1], h_dim, device=device)
         c = torch.zeros(data['seq'].shape[1], h_dim, device=device)
@@ -554,11 +554,13 @@ def validate(model, T_obs, T_pred, file, model_type='v'):
             if batch_idx in range(len(dataset)):
                 err = ADE(Y_pred, Y_g)
                 avgDispErrMeans.append(err)
+                print(f"ade {err}")
 
             if batch_idx in range(len(dataset)):
                 err = FDE(Y_pred, Y_g)
                 finalDispErrMeans.append(err)            
-        
+                print(f"fde {err}")        
+
     for i, d in enumerate(plotting_data):
         print(f"plotting {i}th pic")
         plotting_batch(*d)
