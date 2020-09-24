@@ -17,11 +17,11 @@ Each file in the dataset is of the form
 <code>frame_number    pedestrian_number   y_coordinates   x_coordinates</code>
 <h3>HOWTO</h3>
 To train and validate a model against a specific training & validating set, run <br>
-<kbd>python3 main.py mode --dataset [dataset_name] --epoch [epoch_num] --T_obs [observe_step] --T_pred [predict_step]</kbd><br>
-where <kbd>mode</kbd> can be either <kbd>'s'</kbd> or <kbd>'v'</kbd><br>
+<code>python3 main.py mode --dataset [dataset_name] --epoch [epoch_num] --T_obs [observe_step] --T_pred [predict_step]</code><br>
+where <kdb>mode</kdb> can be either <kdb>'s'</kdb> or <kdb>'v'</kdb><br>
 To only validate a chosen model against a validating set, run <br>
-<kbd>python3 main.py mode --dataset [dataset_name] --pure_val_name [model_dir] --T_obs [observe_step] --T_pred [predict_step]</kbd><br>
+<code>python3 main.py mode --dataset [dataset_name] --pure_val_name [model_dir] --T_obs [observe_step] --T_pred [predict_step]</code><br>
 To validate a chosen model against a special validating set, run <br>
-<kbd>python3 main.py mode --special_model [model_dir] --special_file [file_name] --special_start [start_ped] --T_obs [observe_step] --T_pred [predict_step]</kbd><br>
+<code>python3 main.py mode --special_model [model_dir] --special_file [file_name] --special_start [start_ped] --T_obs [observe_step] --T_pred [predict_step]</code><br>
 Special dataset is the dataset of <code>.pkl</code> file with aligned number of frame numbers.
 If special dataset is too large to run in one sitting, refer to batchprocess.sh.
