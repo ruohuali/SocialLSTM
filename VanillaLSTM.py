@@ -775,7 +775,7 @@ def parse_args():
     parser.add_argument("--special", default=False, type=bool)
     parser.add_argument("--dataset", default="eth", type=str)
     parser.add_argument("--T_obs", default=8, type=int)
-    parser.add_argument("--T_pred", default=12, type=int)    
+    parser.add_argument("--T_pred", default=20, type=int)    
     parser.add_argument("--epoch", default=25, type=int)
     parser.add_argument("--model_name", default="a_just_trained_model_for_")
     parser.add_argument("model_type", type=str)
