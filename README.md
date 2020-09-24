@@ -18,7 +18,7 @@ Each file in the dataset is of the form
 <h3>HOWTO</h3>
 To train and validate a model against a specific training & validating set, run <br>
 <code>python3 main.py mode --dataset [dataset_name] --epoch [epoch_num] --T_obs [observe_step] --T_pred [predict_step]</code><br>
-where <kdb>mode</kdb> can be either <kdb>'s'</kdb> or <kdb>'v'</kdb><br>
+where <kbd>mode</kbd> can be either <kbd>'s'</kbd> or <kbd>'v'</kbd><br>
 To only validate a chosen model against a validating set, run <br>
 <code>python3 main.py mode --dataset [dataset_name] --pure_val_name [model_dir] --T_obs [observe_step] --T_pred [predict_step]</code><br>
 To validate a chosen model against a special validating set, run <br>
