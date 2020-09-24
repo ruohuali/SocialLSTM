@@ -1,5 +1,4 @@
 <h2>Implementation of Social LSTM: Human Trajectory Prediction in Crowded Spaces</h2>
-<hr>
 <h3>Paper</h3>
 <a href="https://cvgl.stanford.edu/papers/CVPR16_Social_LSTM.pdf">Social LSTM: Human Trajectory Prediction in Crowded Spaces</a>
 <h3>Dependencies</h3>
