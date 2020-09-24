@@ -330,7 +330,7 @@ def main():
         end = start+550
         m = torch.load(args.special_model)
         print(f"doing {start}-{end} with {args.special_model}")
-        ade, fde = validateNew(args, 20, 40, args.special_file, start, end, model_type='s')
+        ade, fde = validateNew(m, args.T_obs, args.T_pred, args.special_file, start, end, model_type='s')
         return
 
     if args.pure_val_name == '':
