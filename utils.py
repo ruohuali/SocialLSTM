@@ -284,7 +284,7 @@ def strideReg(X, Y):
 
 def printPics(v,j):
     plt.figure()
-    plt.title(str(vl.hidden_dim))
+    plt.title(str(j))
     for i, data in enumerate(v):
         if len(data) != 0:
             plt.plot(np.arange(len(v[0])), data)        
