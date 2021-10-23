@@ -69,13 +69,6 @@ def train(T_obs, T_pred, files, model_type='v', model=None, name="model.pt", EPO
                     input_seq4 = data['seq'][:T_pred,:,:].clone()
                     part_masks = data['mask']
 
-                    #dirty truncate
-                    # run_ratio = (T_obs+2)/T_pred
-                    # input_seq = trajPruningByAppear(part_masks, ratio=run_ratio, in_tensor=input_seq) 
-                    # Y = trajPruningByAppear(part_masks, ratio=run_ratio, in_tensor=Y)     
-                    # pr_masks = trajPruningByAppear(part_masks, ratio=run_ratio)         
-                    # (input_seq, Y, pr_masks) = trajPruningByStride(pr_masks, input_seq, (input_seq, Y, pr_masks))   
-                    
                     #forward prop
                     if model_type == 'v':
                         output = vl(input_seq, part_masks, h, c, Y, T_obs, T_pred)
@@ -120,18 +113,9 @@ def train(T_obs, T_pred, files, model_type='v', model=None, name="model.pt", EPO
     filelist = [f for f in listdir('eth_plots') if f.endswith(".png") ]
     for f in filelist:
         remove(join('eth_plots', f))
-    def ppp(v,j):
-        plt.figure()
-        plt.title(str(vl.hidden_dim))
-        for i, data in enumerate(v):
-            if len(data) != 0:
-                plt.plot(np.arange(len(v[0])), data)        
-        plt.savefig("eth_plots/"+"train"+str(j))
-        print("--->","eth_plots/"+"train"+str(j))
-    j = 0
-    for k, v in plot_data.items():
-        ppp(v,j)
-        j+=1
+
+    for j, (k, v) in enumerate(plot_data.items()):
+        printPics(v,j)
 
     #save the model
     torch.save(vl, name)
@@ -169,12 +153,6 @@ def validate(model, T_obs, T_pred, file, model_type='v'):
         coords = data['coords']      
         with torch.no_grad():         
             print(f"batch {batch_idx+1}/{len(dataset)}  ", end='\r')
-            #dirty truncate
-            # run_ratio = (T_obs+2)/T_pred
-            # input_seq = trajPruningByAppear(part_masks, ratio=run_ratio, in_tensor=input_seq) 
-            # Y = trajPruningByAppear(part_masks, ratio=run_ratio, in_tensor=Y)     
-            # pr_masks = trajPruningByAppear(part_masks, ratio=run_ratio)
-            # (input_seq, Y, pr_masks) = trajPruningByStride(pr_masks, input_seq, (input_seq, Y, pr_masks))
             
             #forward prop
             if model_type == 'v':

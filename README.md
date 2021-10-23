@@ -25,4 +25,4 @@ To only validate a chosen model against a validating set, run <br>
 To validate a chosen model against a special validating set, run <br>
 <code>python3 main.py mode --special_model [model_dir] --special_file [file_name] --special_start [start_ped] --T_obs [observe_step] --T_pred [predict_step]</code><br>
 Special dataset is the dataset of <code>.pkl</code> file with aligned number of frame numbers.
-If special dataset is too large to run in one sitting, refer to batchprocess.sh.
+If special dataset is too large to run in one sitting, refer to batchprocess.sh .

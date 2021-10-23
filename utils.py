@@ -233,14 +233,6 @@ class FramesDataset(Dataset):
         return trajs_coords
         
 
-# if __name__ == '__main__':
-#     D = FramesDataset("x_all.p", special=True)
-#     pdb.set_trace()
-#     for i in range(len(D)):
-#         data_packet = D[i]
-#         pdb.set_trace()
-
-
 def trajPruningByAppear(part_mask, ratio=0.6, in_tensor=None):
     if in_tensor != None:
         #count appearance
@@ -288,3 +280,13 @@ def strideReg(X, Y):
     Y_total_len = 1.5*torch.sum(torch.abs(Y_all))
     Loss = torch.abs(Y_total_len - X_total_len)
     return Loss
+
+
+def printPics(v,j):
+    plt.figure()
+    plt.title(str(vl.hidden_dim))
+    for i, data in enumerate(v):
+        if len(data) != 0:
+            plt.plot(np.arange(len(v[0])), data)        
+    plt.savefig("eth_plots/"+"train"+str(j))
+    print("--->","eth_plots/"+"train"+str(j))
