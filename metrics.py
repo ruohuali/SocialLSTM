@@ -1,6 +1,6 @@
 from main import *
 device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
-
+  
 def calcCoordinatesNew(start_point, offsets):
     next_point = start_point
     coords = torch.zeros(offsets.shape[0]+1,offsets.shape[1],offsets.shape[2])
